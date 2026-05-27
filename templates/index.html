@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PO Cost Changes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #1a1a2e;
+    }
+
+    .card {
+      position: relative;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 40px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 32px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #c5cae9;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: #fafafa;
+    }
+
+    .drop-zone.drag-over {
+      border-color: #3f51b5;
+      background: #e8eaf6;
+    }
+
+    .drop-zone svg {
+      width: 48px;
+      height: 48px;
+      color: #9fa8da;
+      margin-bottom: 12px;
+    }
+
+    .drop-zone p {
+      color: #555;
+      font-size: 0.95rem;
+    }
+
+    .drop-zone .browse-link {
+      color: #3f51b5;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .drop-zone input[type=file] { display: none; }
+
+    .zone-label {
+      margin: 24px 0 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: #555;
+      text-transform: uppercase;
+    }
+    .zone-label .optional {
+      font-weight: 400;
+      color: #999;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    #process-btn:hover:not(:disabled) { background: #303f9f; }
+    #process-btn:disabled { background: #c5cae9; cursor: not-allowed; }
+
+    .upload-warning {
+      margin: 24px 0 0;
+      padding: 14px 16px;
+      background: #ffebee;
+      border: 2px solid #c62828;
+      border-radius: 8px;
+      color: #c62828;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
+    }
+
+    .upload-warning-users {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px 12px;
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .file-hint {
+      font-size: 0.8rem;
+      color: #999;
+      margin-top: 6px;
+    }
+
+    /* Status */
+    #status-area { margin-top: 24px; display: none; }
+
+    .progress-bar-wrap {
+      background: #e8eaf6;
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #3f51b5;
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .status-text {
+      font-size: 0.88rem;
+      color: #555;
+    }
+
+    /* Results */
+    #results-area { margin-top: 28px; display: none; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .results-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .date-badge {
+      background: #e8eaf6;
+      color: #3f51b5;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 99px;
+    }
+
+    .download-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #1a1a2e;
+      text-decoration: none;
+      margin-bottom: 8px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .download-btn:hover {
+      background: #f5f5f5;
+      border-color: #bdbdbd;
+    }
+
+    .download-btn .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .icon-combined { background: #1D6F42; }
+    .icon-zip      { background: #00897b; }
+    .icon-company  { background: #1D6F42; border: none; }
+
+    .download-btn .icon svg {
+      width: 18px;
+      height: 18px;
+      color: #fff;
+    }
+
+    .icon-company svg { color: #fff; }
+
+    .btn-label { flex: 1; text-align: left; }
+    .btn-label strong { display: block; font-size: 0.88rem; }
+    .btn-label small { color: #888; font-size: 0.78rem; }
+
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+    .stats-table th {
+      text-align: left;
+      font-weight: 600;
+      color: #999;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0 8px 6px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .stats-table th:not(:first-child) { text-align: right; }
+    .stats-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #333;
+    }
+    .stats-table td:not(:first-child) { text-align: right; color: #555; }
+    .stats-table tr.combined-row td { font-weight: 700; color: #1a1a2e; background: #f7f8ff; }
+    .stats-table tr:last-child td { border-bottom: none; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #999;
+      margin: 16px 0 8px;
+    }
+
+    .company-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .company-grid .download-btn {
+      margin-bottom: 0;
+    }
+
+    /* Reset */
+    #reset-btn {
+      display: block;
+      margin: 24px auto 0;
+      background: none;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      color: #666;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 8px 20px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    #reset-btn:hover { background: #f5f5f5; border-color: #bdbdbd; color: #333; }
+    
+    #clear-btn {
+      display: none;
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px;
+      background: #fdecea;
+      border: 1px solid #f5c6cb;
+      border-radius: 10px;
+      color: #c0392b;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #clear-btn:hover { background: #fad4d0; }
+
+    /* Error */
+    .error-box {
+      background: #fdecea;
+      border: 1px solid #f5c6cb;
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #c0392b;
+      font-size: 0.88rem;
+      margin-top: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>PO Cost Changes</h1>
+  <p class="subtitle">Upload one or more PO Cost Changes files and the corresponding Purchase Details files. Any PO # appearing in both will be excluded from the cost change output files which are uploaded to QBO.</p>
+
+  <div class="zone-label">PO Cost Changes</div>
+  <div id="drop-zone" class="drop-zone">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+    </svg>
+    <p>Drag &amp; drop your <strong>PO Cost Changes</strong> Excel or CSV files here, or <span class="browse-link" id="browse-link">browse</span></p>
+    <p class="file-hint">Accepts .xlsx, .xlsm, .csv — select multiple files to merge</p>
+    <input type="file" id="file-input" accept=".xlsx,.xlsm,.xls,.csv" multiple />
+  </div>
+
+  <div class="zone-label">Purchase Details</div>
+  <div id="pd-drop-zone" class="drop-zone">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+    </svg>
+    <p>Drag &amp; drop your <strong>Purchase Details</strong> Excel or CSV files here, or <span class="browse-link" id="pd-browse-link">browse</span></p>
+    <p class="file-hint">Accepts .xlsx, .xlsm, .csv — select multiple files to merge</p>
+    <input type="file" id="pd-file-input" accept=".xlsx,.xlsm,.xls,.csv" multiple />
+  </div>
+
+  <div id="upload-screen-warning" class="upload-warning">
+    MAKE SURE TO REMOVE COST CHANGE LINES FROM Y&amp;S ACCOUNTING TEAM USERS THAT WERE ALREADY MADE IN QBO BEFORE UPLOADING THE DATA HERE. HERE IS THE LIST OF ACCOUNTING TEAM USERS TO LOOK OUT FOR:
+    <div class="upload-warning-users">
+      <span>jhantz</span><span>jhantz-2</span><span>jhantz-3</span><span>bblumenthal</span>
+      <span>yklein</span><span>awealcatch</span><span>cschlesinger</span><span>dbowden</span>
+      <span>macohen (not mcohen)</span><span>gbollag</span><span>mtawil</span><span>sgreenhouse</span>
+      <span>msadiu</span><span>lrafuna</span><span>fajeti</span><span>mmeta</span>
+    </div>
+  </div>
+
+  <button id="process-btn" style="display:none; margin-top:20px; width:100%; padding:14px; background:#3f51b5; color:white; border:0; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer;" disabled>Add files to continue</button>
+
+  <div id="file-list">
+    <div id="file-list-header"></div>
+    <div id="file-list-items"></div>
+  </div>
+  <div class="error-box" id="error-box"></div>
+
+  <div id="status-area">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <p class="status-text" id="status-text">Uploading file…</p>
+  </div>
+
+  <div id="results-area">
+    <div class="results-header">
+      <h2>Files ready to download</h2>
+      <span class="date-badge" id="date-badge"></span>
+    </div>
+
+    <div id="excluded-banner" style="display:none; margin: 12px 0; padding: 10px 14px; background:#fff8e1; border-left:4px solid #ffb300; border-radius:6px; font-size:0.9rem; color:#5d4037;"></div>
+    <div id="ignored-banner" style="display:none; margin: 12px 0; padding: 10px 14px; background:#eceff1; border-left:4px solid #607d8b; border-radius:6px; font-size:0.9rem; color:#37474f;"></div>
+
+    <div class="upload-warning">
+      MAKE SURE TO REVIEW CATEGORIZATIONS OF DUE FROM VENDORS OPEN AND TC. AND THAT VENDORS LIKE BALLPARK, BROADWAY SEASONS, BROADWAY GROUPS, CONCERT SEASONS, LIVE NATION FLEX, TICKETS.COM, AND TICKETMASTER AM ARE MANUALLY UPDATED BEFORE UPLOADING TO QBO.
+    </div>
+
+    <a class="download-btn" id="btn-zip" href="#" download>
+      <span class="icon icon-zip">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+      </span>
+      <span class="btn-label">
+        <strong>Download All (.zip)</strong>
+        <small>Includes combined file + all company files</small>
+      </span>
+    </a>
+
+    <p class="section-label">Summary</p>
+    <table class="stats-table" id="stats-table">
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Rows</th>
+          <th>Total Cost Change</th>
+        </tr>
+      </thead>
+      <tbody id="stats-body"></tbody>
+    </table>
+
+    <p class="section-label" style="margin-top:20px;">Individual Company Files</p>
+    <div class="company-grid" id="company-grid"></div>
+  </div>
+
+  <button id="reset-btn" style="display:none;">Process another file</button>
+  <button id="clear-btn">✕ Clear All &amp; Start Over</button>
+</div>
+
+<script>
+  const dropZone   = document.getElementById("drop-zone");
+  const fileInput  = document.getElementById("file-input");
+  const browseLink = document.getElementById("browse-link");
+  const pdDropZone = document.getElementById("pd-drop-zone");
+  const pdFileInput = document.getElementById("pd-file-input");
+  const pdBrowseLink = document.getElementById("pd-browse-link");
+  const statusArea = document.getElementById("status-area");
+  const progressBar = document.getElementById("progress-bar");
+  const statusText = document.getElementById("status-text");
+  const resultsArea = document.getElementById("results-area");
+  const errorBox   = document.getElementById("error-box");
+  const resetBtn   = document.getElementById("reset-btn");
+  const clearBtn   = document.getElementById("clear-btn");
+
+  let currentJobId = null;
+  let pollTimer = null;
+  let ccFiles = [];   // PO Cost Changes files staged
+  let pdFiles = [];   // Purchase Details files staged
+
+  browseLink.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) stageCcFiles(fileInput.files);
+  });
+
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files.length) stageCcFiles(e.dataTransfer.files);
+  });
+
+  // Purchase Details zone — collects files but doesn't trigger processing.
+  pdBrowseLink.addEventListener("click", () => pdFileInput.click());
+  pdFileInput.addEventListener("change", () => {
+    if (pdFileInput.files.length) stagePdFiles(pdFileInput.files);
+  });
+  pdDropZone.addEventListener("dragover", e => { e.preventDefault(); pdDropZone.classList.add("drag-over"); });
+  pdDropZone.addEventListener("dragleave", () => pdDropZone.classList.remove("drag-over"));
+  pdDropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    pdDropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files.length) stagePdFiles(e.dataTransfer.files);
+  });
+
+  function stageCcFiles(files) {
+    ccFiles = Array.from(files);
+    const label = dropZone.querySelector("p");
+    label.innerHTML = `<strong>${ccFiles.length} PO Cost Changes file${ccFiles.length > 1 ? "s" : ""} staged</strong> — <span class="browse-link" id="cc-replace-link">replace</span>`;
+    document.getElementById("cc-replace-link").addEventListener("click", () => fileInput.click());
+    refreshProcessButton();
+  }
+
+  function stagePdFiles(files) {
+    pdFiles = Array.from(files);
+    const label = pdDropZone.querySelector("p");
+    label.innerHTML = `<strong>${pdFiles.length} Purchase Details file${pdFiles.length > 1 ? "s" : ""} staged</strong> — <span class="browse-link" id="pd-replace-link">replace</span>`;
+    document.getElementById("pd-replace-link").addEventListener("click", () => pdFileInput.click());
+    refreshProcessButton();
+  }
+
+  function refreshProcessButton() {
+    const btn = document.getElementById("process-btn");
+    const hasAny = ccFiles.length > 0 || pdFiles.length > 0;
+    const ready = ccFiles.length > 0 && pdFiles.length > 0;
+    btn.disabled = !ready;
+    btn.style.display = hasAny ? "block" : "none";
+    // Also surface the Clear button on the upload screen — gives users a
+    // way to back out without picking different files.
+    clearBtn.style.display = hasAny ? "block" : "none";
+    if (ready) {
+      btn.textContent = `Process ${ccFiles.length} cost-change + ${pdFiles.length} Purchase Details file${(ccFiles.length + pdFiles.length) > 2 ? "s" : ""}`;
+    } else if (ccFiles.length && !pdFiles.length) {
+      btn.textContent = "Add a Purchase Details file to continue";
+    } else if (pdFiles.length && !ccFiles.length) {
+      btn.textContent = "Add a PO Cost Changes file to continue";
+    }
+  }
+
+  function resetAll() {
+    currentJobId = null;
+    clearInterval(pollTimer);
+    resultsArea.style.display = "none";
+    statusArea.style.display = "none";
+    errorBox.style.display = "none";
+    resetBtn.style.display = "none";
+    clearBtn.style.display = "none";
+    dropZone.style.display = "";
+    pdDropZone.style.display = "";
+    document.querySelectorAll(".zone-label").forEach(el => el.style.display = "");
+    document.getElementById("upload-screen-warning").style.display = "";
+    document.getElementById("file-list").style.display = "none";
+    fileInput.value = "";
+    pdFileInput.value = "";
+    ccFiles = [];
+    pdFiles = [];
+    // Reset both zone labels
+    dropZone.querySelector("p").innerHTML = `Drag &amp; drop your <strong>PO Cost Changes</strong> Excel or CSV files here, or <span class="browse-link" id="browse-link">browse</span>`;
+    document.getElementById("browse-link").addEventListener("click", () => fileInput.click());
+    pdDropZone.querySelector("p").innerHTML = `Drag &amp; drop your <strong>Purchase Details</strong> Excel or CSV files here, or <span class="browse-link" id="pd-browse-link">browse</span>`;
+    document.getElementById("pd-browse-link").addEventListener("click", () => pdFileInput.click());
+    refreshProcessButton();
+    progressBar.style.width = "0%";
+  }
+
+  document.getElementById("process-btn").addEventListener("click", startProcessing);
+
+  clearBtn.addEventListener("click", resetAll);
+  resetBtn.addEventListener("click", () => {
+    resetAll();
+  });
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = "block";
+    statusArea.style.display = "none";
+    resetBtn.style.display = "block";
+  }
+
+  function showFileList() {
+    const listEl = document.getElementById("file-list");
+    const header = document.getElementById("file-list-header");
+    const items  = document.getElementById("file-list-items");
+    const total = ccFiles.length + pdFiles.length;
+    header.textContent = `${total} file${total > 1 ? "s" : ""} selected`;
+    items.innerHTML = "";
+    const fmt = f => {
+      const size = f.size < 1024*1024 ? (f.size/1024).toFixed(1)+"KB" : (f.size/1024/1024).toFixed(1)+"MB";
+      return `<span class="file-name">📄 ${f.name}</span><span class="file-size">${size}</span>`;
+    };
+    ccFiles.forEach(f => {
+      const div = document.createElement("div");
+      div.className = "file-item";
+      div.innerHTML = fmt(f);
+      items.appendChild(div);
+    });
+    pdFiles.forEach(f => {
+      const div = document.createElement("div");
+      div.className = "file-item";
+      div.innerHTML = fmt(f) + ' <span style="color:#999; font-size:0.8rem; margin-left:8px;">(Purchase Details)</span>';
+      items.appendChild(div);
+    });
+    listEl.style.display = "block";
+  }
+
+  async function startProcessing() {
+    if (ccFiles.length === 0 || pdFiles.length === 0) return;
+    showFileList();
+    dropZone.style.display = "none";
+    pdDropZone.style.display = "none";
+    document.querySelectorAll(".zone-label").forEach(el => el.style.display = "none");
+    document.getElementById("process-btn").style.display = "none";
+    document.getElementById("upload-screen-warning").style.display = "none";
+    errorBox.style.display = "none";
+    statusArea.style.display = "block";
+    resultsArea.style.display = "none";
+    resetBtn.style.display = "none";
+    clearBtn.style.display = "block";
+    progressBar.style.width = "15%";
+    statusText.textContent = `Uploading ${ccFiles.length} cost-change + ${pdFiles.length} Purchase Details file${(ccFiles.length+pdFiles.length) > 2 ? "s" : ""}…`;
+
+    const formData = new FormData();
+    ccFiles.forEach(f => formData.append("file", f));
+    pdFiles.forEach(f => formData.append("pd_file", f));
+
+    let jobId;
+    try {
+      const res = await fetch("/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.error) { showError(data.error); return; }
+      jobId = data.job_id;
+      currentJobId = jobId;
+    } catch (e) {
+      showError("Upload failed. Please try again."); return;
+    }
+
+    progressBar.style.width = "40%";
+    statusText.textContent = "Processing file…";
+    pollTimer = setInterval(() => pollStatus(jobId), 1500);
+  }
+
+  async function pollStatus(jobId) {
+    if (currentJobId !== jobId) { clearInterval(pollTimer); return; }
+    try {
+      const res = await fetch(`/status/${jobId}`);
+      const data = await res.json();
+
+      if (data.status === "processing") {
+        const w = parseFloat(progressBar.style.width) || 40;
+        progressBar.style.width = Math.min(w + 8, 88) + "%";
+        return;
+      }
+      clearInterval(pollTimer);
+
+      if (data.status === "error") { showError("Processing error: " + data.message); return; }
+      if (data.status === "done") showResults(jobId, data);
+    } catch (e) {
+      clearInterval(pollTimer);
+      showError("Lost connection. Please reload and try again.");
+    }
+  }
+
+  function showResults(jobId, data) {
+    progressBar.style.width = "100%";
+    statusText.textContent = "Done!";
+
+    setTimeout(() => {
+      statusArea.style.display = "none";
+      resultsArea.style.display = "block";
+      resetBtn.style.display = "block";
+    }, 400);
+
+    document.getElementById("date-badge").textContent = data.date_range;
+    document.getElementById("btn-zip").href = `/download/${jobId}/all`;
+
+    // Excluded banner — show if Purchase Details files removed any rows.
+    const excluded = data.excluded || {row_count: 0, po_count: 0, total_adjustment: 0};
+    const banner = document.getElementById("excluded-banner");
+    if (excluded.row_count > 0) {
+      const amt = (excluded.total_adjustment || 0).toLocaleString("en-US",
+        {style: "currency", currency: "USD"});
+      banner.textContent = `Excluded ${excluded.row_count.toLocaleString()} row${excluded.row_count === 1 ? "" : "s"} (covering ${excluded.po_count.toLocaleString()} PO #${excluded.po_count === 1 ? "" : "s"}, ${amt}) that also appeared in the Purchase Details files. See the Excluded tab in the combined workbook.`;
+      banner.style.display = "block";
+    } else {
+      banner.style.display = "none";
+    }
+
+    // Ignored-companies banner — show if any uploaded rows came from a
+    // company that's not in the QBO master mapping (those are skipped
+    // entirely; they don't appear on Source Data either).
+    const ignored = data.ignored_companies || {};
+    const ignoredEntries = Object.entries(ignored);
+    const ignoredBanner = document.getElementById("ignored-banner");
+    if (ignoredEntries.length > 0) {
+      const totalRows = ignoredEntries.reduce((a, [, v]) => a + v, 0);
+      const list = ignoredEntries
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => `${name} (${count.toLocaleString()})`)
+        .join(", ");
+      ignoredBanner.textContent = `Ignored ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"} from compan${ignoredEntries.length === 1 ? "y" : "ies"} not in the QBO master list: ${list}.`;
+      ignoredBanner.style.display = "block";
+    } else {
+      ignoredBanner.style.display = "none";
+    }
+
+    // Populate stats table
+    const statsBody = document.getElementById("stats-body");
+    statsBody.innerHTML = "";
+    const stats = data.stats || {};
+    const allCompanies = data.all_companies || data.companies;
+
+    // Combined row first
+    if (stats["Combined"]) {
+      const tr = document.createElement("tr");
+      tr.className = "combined-row";
+      tr.innerHTML = `<td>Combined</td><td>${stats["Combined"].rows.toLocaleString()}</td><td>$${stats["Combined"].total_cost.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>`;
+      statsBody.appendChild(tr);
+    }
+    // All company rows — no opacity difference
+    allCompanies.forEach(company => {
+      const s = stats[company] || {rows: 0, total_cost: 0};
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${company}</td><td>${s.rows.toLocaleString()}</td><td>$${s.total_cost.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>`;
+      statsBody.appendChild(tr);
+    });
+
+    // Build company grid — Combined first, then all companies
+    const grid = document.getElementById("company-grid");
+    grid.innerHTML = "";
+
+    // Combined button
+    const combinedBtn = document.createElement("a");
+    combinedBtn.className = "download-btn";
+    combinedBtn.href = `/download/${jobId}/combined`;
+    combinedBtn.download = "";
+    combinedBtn.innerHTML = `
+      <span class="icon icon-combined">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"/>
+        </svg>
+      </span>
+      <span class="btn-label"><strong>Combined</strong></span>`;
+    grid.appendChild(combinedBtn);
+
+    // Company buttons — all shown, no opacity difference
+    const companiesWithData = new Set(data.companies);
+    allCompanies.forEach(company => {
+      const hasData = companiesWithData.has(company);
+      const el = document.createElement(hasData ? "a" : "div");
+      el.className = "download-btn";
+      if (hasData) {
+        el.href = `/download/${jobId}/company/${encodeURIComponent(company)}`;
+        el.download = "";
+      } else {
+        el.style.opacity = "0.4";
+        el.style.cursor = "default";
+        el.style.pointerEvents = "none";
+      }
+      el.innerHTML = `
+        <span class="icon icon-company">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"/>
+          </svg>
+        </span>
+        <span class="btn-label"><strong>${company}</strong>${!hasData ? '<small>No data</small>' : ''}</span>`;
+      grid.appendChild(el);
+    });
+  }
+</script>
+</body>
+</html>
