@@ -435,6 +435,19 @@
       <tbody id="stats-body"></tbody>
     </table>
 
+    <a class="download-btn" id="btn-combined" href="#" download style="margin-top:20px;">
+      <span class="icon icon-combined">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"/>
+        </svg>
+      </span>
+      <span class="btn-label">
+        <strong>Combined</strong>
+        <small>All companies in one multi-tab workbook</small>
+      </span>
+    </a>
+
     <p class="section-label" style="margin-top:20px;">Expenses — QBO Import Format (one per company)</p>
     <div class="company-grid" id="company-grid"></div>
 
@@ -736,6 +749,7 @@
 
     document.getElementById("date-badge").textContent = data.date_range;
     document.getElementById("btn-zip").href = `/download/${jobId}/all`;
+    document.getElementById("btn-combined").href = `/download/${jobId}/combined`;
 
     // Excluded banner — show if any rows were removed via the Remove=X flag.
     const excluded = data.excluded || {row_count: 0, po_count: 0, total_adjustment: 0};
@@ -788,24 +802,10 @@
       statsBody.appendChild(tr);
     });
 
-    // Build company grid — Combined first, then all companies
+    // Build company grid — per-company Expenses files (Combined now lives in
+    // its own button above the Expenses heading).
     const grid = document.getElementById("company-grid");
     grid.innerHTML = "";
-
-    // Combined button
-    const combinedBtn = document.createElement("a");
-    combinedBtn.className = "download-btn";
-    combinedBtn.href = `/download/${jobId}/combined`;
-    combinedBtn.download = "";
-    combinedBtn.innerHTML = `
-      <span class="icon icon-combined">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"/>
-        </svg>
-      </span>
-      <span class="btn-label"><strong>Combined</strong></span>`;
-    grid.appendChild(combinedBtn);
 
     // Company buttons — all shown, no opacity difference
     const companiesWithData = new Set(data.companies);
