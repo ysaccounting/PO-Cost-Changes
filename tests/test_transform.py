@@ -307,6 +307,22 @@ def test_axs_substring_replacement_to_veritix():
     assert v == ["Veritix"]
 
 
+def test_concert_extras_at_msg_becomes_madison_square_garden():
+    # At Madison Square Garden (or its parking lots), Concert Extras -> MSG,
+    # overriding the general Concert Extras -> Live Nation Extras rule.
+    for ven in ("Madison Square Garden", "Madison Square Garden Parking Lots"):
+        v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
+                                VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
+        assert v == ["Madison Square Garden"], ven
+
+
+def test_concert_extras_elsewhere_still_live_nation_extras():
+    v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
+                            VenueName="Some Other Arena", InitialTicketCostTotal=0,
+                            TicketCostTotal=100)])
+    assert v == ["Live Nation Extras"]
+
+
 def test_tickets_com_team_vs_venue():
     rows = [
         _row(PurchaseOrderID=1, Vendor="Tickets.com", PerformerName="New York Yankees",
