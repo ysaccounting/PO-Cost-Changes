@@ -1085,3 +1085,39 @@ def test_ysa_label_is_asher_value_preserved():
     assert {r[ci] for r in sd.iter_rows(min_row=2, values_only=True) if r[ci]} == {"YSA"}
     bills = wb["Bills"]; mi = [c.value for c in bills[1]].index("Memo")
     assert "Cost Changes (YSA)" in bills.cell(2, mi + 1).value
+
+
+def test_expense_numbers_are_random_8_digit_like_bill_numbers():
+    # Expense # is a unique random 8-digit integer per event (same style as the
+    # Bills file's "Bill No."), an expense pair's two legs share one number, and
+    # the deterministic grouped/ordered layout is preserved.
+    import openpyxl, io as _io
+    from collections import Counter
+    rows = ([_row(PurchaseOrderID=i, CompanyName="YSA", PerformerName=f"E{i}",
+                  AccountEmail=f"e{i}@x.com", InitialTicketCostTotal=100, TicketCostTotal=20)
+             for i in range(1, 5)] +                                   # 4 expenses
+            [_row(PurchaseOrderID=i, CompanyName="YSA", PerformerName=f"B{i}",
+                  AccountEmail=f"e{i}@x.com", InitialTicketCostTotal=0, TicketCostTotal=50)
+             for i in range(5, 8)])                                    # 3 bills
+    res = processor.process_files([(_to_xlsx_bytes(rows), "f.xlsx")])
+    out = processor.build_filtered_outputs(res["_cleaned"], res["_source_view"],
+            res["_excluded_view"], res["date_range"], res["all_companies"])
+    wb = openpyxl.load_workbook(_io.BytesIO(out["combined"]))
+
+    def expense_nums(sheet):
+        hdr = [c.value for c in sheet[1]]; ei = hdr.index("Expense #")
+        return [sheet.cell(r, ei + 1).value for r in range(2, sheet.max_row + 1)]
+
+    is8 = lambda n: isinstance(n, int) and 10_000_000 <= n <= 99_999_999
+
+    # Combined tab: one row per event (bills + each expense's IA leg).
+    comb = expense_nums(wb["Combined"])
+    assert comb and all(is8(n) for n in comb)
+    assert len(comb) == len(set(comb))          # globally unique
+    assert comb == sorted(comb)                 # ordering preserved
+
+    # Per-company expenses tab: two legs per expense share one number.
+    exp = expense_nums(wb["Asher"])
+    assert exp and all(is8(n) for n in exp)
+    assert all(v == 2 for v in Counter(exp).values())
+    assert exp == sorted(exp)

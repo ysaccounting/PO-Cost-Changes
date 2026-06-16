@@ -1046,9 +1046,10 @@ def _build_bills_and_expenses(
                 'Due from Vendors - Open'. Total = -Total Adjustment (positive),
                 so the pair sums to zero.
 
-    Both share the same column shape and a single global 'Expense #' counter
-    incrementing across the whole result (Bills + Expenses interleaved by
-    display order, then by PO #).
+    Both share the same column shape and a single global 'Expense #' value per
+    event — a unique random 8-digit integer (same style as the Bills file's
+    "Bill No."), assigned in the result's grouped display order. An expense
+    pair's two lines carry the same Expense #.
     """
     if tc_vendors is None:
         tc_vendors = get_tc_vendors()
@@ -1064,15 +1065,21 @@ def _build_bills_and_expenses(
         empty = pd.DataFrame(columns=ledger_cols)
         return empty.copy(), empty.copy()
 
-    # Order events by display order, then date and vendor, so the global
-    # Expense # is deterministic and groups each company's rows together.
+    # Order events by display order, then date and vendor, so row ordering is
+    # deterministic and groups each company's rows together.
     df = cleaned.copy()
     df["_display_order"] = df["Company"].map(_sort_key)
     df = df.sort_values(
         ["_display_order", "Adjustment Date", "Vendor", "Team/Performer"],
         kind="mergesort",
     ).reset_index(drop=True)
-    df["Expense #"] = range(1, len(df) + 1)
+    # Expense # is a random 8-digit integer per event (same style as the Bills
+    # file's "Bill No."). We draw unique values and assign them in ascending
+    # order over the deterministic row order above: this keeps every downstream
+    # sort_values("Expense #") producing that same grouped/ordered layout, keeps
+    # the values unique (the per-company display mapping keys on them), and makes
+    # an expense pair's two lines share one number (both come from the same row).
+    df["Expense #"] = sorted(random.sample(range(10_000_000, 100_000_000), len(df)))
 
     df["_memo"] = df.apply(_full_memo, axis=1)
 
