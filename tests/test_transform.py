@@ -308,9 +308,11 @@ def test_axs_substring_replacement_to_veritix():
 
 
 def test_concert_extras_at_msg_becomes_madison_square_garden():
-    # At Madison Square Garden (or its parking lots), Concert Extras -> MSG,
+    # At any MSG Entertainment venue (MSG + its parking lots, Radio City Music
+    # Hall, Beacon Theatre), Concert Extras -> "Madison Square Garden",
     # overriding the general Concert Extras -> Live Nation Extras rule.
-    for ven in ("Madison Square Garden", "Madison Square Garden Parking Lots"):
+    for ven in ("Madison Square Garden", "Madison Square Garden Parking Lots",
+                "Radio City Music Hall", "Beacon Theatre - New York"):
         v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
                                 VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
         assert v == ["Madison Square Garden"], ven

@@ -383,10 +383,16 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
         return venue.iat[i] if venue.iat[i] else v
     df["Vendor"] = [resolve_tm_am(i) for i in range(len(df))]
 
-    # 1b. Concert Extras at Madison Square Garden (or its parking lots) ->
-    #     "Madison Square Garden". This overrides the general
-    #     "Concert Extras" -> "Live Nation Extras" rename done in stage 2.
-    msg_venues = {"madison square garden", "madison square garden parking lots"}
+    # 1b. Concert Extras at a Madison Square Garden Entertainment venue ->
+    #     "Madison Square Garden". Covers MSG itself (and its parking lots),
+    #     Radio City Music Hall, and the Beacon Theatre. This overrides the
+    #     general "Concert Extras" -> "Live Nation Extras" rename done in stage 2.
+    msg_venues = {
+        "madison square garden",
+        "madison square garden parking lots",
+        "radio city music hall",
+        "beacon theatre - new york",
+    }
     msg_mask = (df["Vendor"] == "Concert Extras") & venue.str.lower().isin(msg_venues)
     df.loc[msg_mask, "Vendor"] = "Madison Square Garden"
 
