@@ -26,6 +26,14 @@ DEFAULT_PATH = Path("data") / "Master_Mapping_List.xlsx"
 QBO_COL = "QBO Company"
 TV_COL_SUBSTRING = "TicketVault"  # column header starts with this
 
+# QBO companies to hard-exclude from processing entirely, no matter what the
+# master mapping file contains. Any TicketVault row that maps to one of these is
+# dropped at load time, so the company never appears in the selection list or
+# the output (matching rows fall through to "ignored"). This is a code-level
+# safety net so a removed company stays gone even if the deployed master file
+# still lists it. Compared case-insensitively; keep entries lowercased.
+EXCLUDED_QBO_COMPANIES: frozenset[str] = frozenset({"damona & crew", "ys needle tickets"})
+
 
 def _find_columns(df: pd.DataFrame) -> tuple[str, str]:
     """Locate the QBO and TicketVault columns regardless of newline quirks."""
@@ -66,6 +74,8 @@ def load_mapping(path: Path | str | None = None) -> dict[str, str]:
         dst_clean = str(dst).strip()
         if not src_clean or not dst_clean:
             continue
+        if dst_clean.lower() in EXCLUDED_QBO_COMPANIES:
+            continue  # hard-excluded company — never map it (see constant above)
         mapping[src_clean] = dst_clean
     log.info("Loaded %d company mappings from %s", len(mapping), path)
     return mapping

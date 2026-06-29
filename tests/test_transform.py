@@ -1147,3 +1147,23 @@ def test_mixed_precision_timestamp_still_same_day_excluded():
     )
     assert "Asher" not in out["bills_files"]           # nothing survives -> no output files
     assert "Asher" not in out["companies"]
+
+
+def test_excluded_qbo_company_dropped_even_if_in_master(tmp_path):
+    # A QBO company in mapping.EXCLUDED_QBO_COMPANIES must be dropped at load
+    # time even when the master file still lists it — so a removed company stays
+    # gone regardless of the deployed master (matching rows -> "ignored").
+    import mapping
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active
+    ws.append(["QBO Company", "TicketVault Company /  Applied Payments Category"])
+    ws.append(["Damona & Crew", "Damon and Crew"])   # excluded company
+    ws.append(["YS Needle Tickets", "Needle YS"])    # excluded company
+    ws.append(["Y&S Tickets", "Y&S"])                # normal company, must survive
+    path = tmp_path / "master.xlsx"; wb.save(path)
+    m = mapping.load_mapping(path)
+    assert "damon and crew" not in m
+    assert "needle ys" not in m
+    assert "Damona & Crew" not in set(m.values())
+    assert "YS Needle Tickets" not in set(m.values())
+    assert m.get("y&s") == "Y&S Tickets"
