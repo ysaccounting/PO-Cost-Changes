@@ -1052,6 +1052,18 @@ def _memo2(row) -> str:
     return f"{memo} {cp}" if cp else memo
 
 
+def _season_tag(vendor) -> str:
+    """Auto-tag a row's 'Seasons' value from its final vendor name, matching the
+    Purchase Details app's logic: the Live Nation Extras vendor tags as
+    'LN Extras', any other Live Nation vendor as 'Live Nation'; the Broadway
+    Extras vendor as 'Broadway Extras', any other Broadway vendor as 'Broadway'.
+    Everything else is left untagged (blank)."""
+    v = str(vendor)
+    seasons = "LN Extras" if v == "Live Nation Extras" else ("Live Nation" if "Live Nation" in v else "")
+    broadway = "Broadway Extras" if v == "Broadway Extras" else ("Broadway" if "Broadway" in v else "")
+    return seasons + broadway
+
+
 def _build_bills_and_expenses(
     cleaned: pd.DataFrame,
     tc_vendors: set[str] | None = None,
@@ -1077,7 +1089,7 @@ def _build_bills_and_expenses(
 
     ledger_cols = [
         "Company", "Account", "Date", "Category", "Expense #",
-        "Vendor", "Memo", "Description", "Total",
+        "Vendor", "Memo", "Description", "Total", "Seasons",
     ]
 
     # Empty input → empty frames with the right shape, so downstream writers
@@ -1116,6 +1128,7 @@ def _build_bills_and_expenses(
         "Memo":        bills_src["_memo"],
         "Description": bills_src["_memo"],
         "Total":       bills_src["Total Adjustment"],
+        "Seasons":     bills_src["Vendor"].map(_season_tag),
     })
 
     # Expenses: negative adjustments → two rows each, summing to zero.
@@ -1132,6 +1145,7 @@ def _build_bills_and_expenses(
             "Memo":        exp_src["_memo"],
             "Description": exp_src["_memo"],
             "Total":       exp_src["Total Adjustment"],   # already negative
+            "Seasons":     exp_src["Vendor"].map(_season_tag),
         })
         # Line B — Vendor (TC) or Due from Vendors - Open, positive offset
         line_b = pd.DataFrame({
@@ -1144,6 +1158,7 @@ def _build_bills_and_expenses(
             "Memo":        exp_src["_memo"],
             "Description": exp_src["_memo"],
             "Total":       -exp_src["Total Adjustment"],  # positive (flips sign)
+            "Seasons":     "",                            # offset leg is not Inventory Asset
         })
         # Interleave A,B,A,B,... by sorting on (Expense #, line_order)
         line_a["_line"] = 0
@@ -1518,7 +1533,7 @@ def build_pd_bills(cleaned: pd.DataFrame) -> pd.DataFrame:
       Team/Performer — full memo "… / Cost Changes (Company)"
       Memo           — same as Team/Performer
       Total Cost     — the positive adjustment amount
-      Seasons        — blank (manual entry by the user)
+      Seasons        — auto-tag from the final vendor (Live Nation / Broadway)
 
     Includes a hidden "_display_label" column so process_files can split the
     rows into one file per QBO company; it's dropped before writing.
@@ -1542,7 +1557,7 @@ def build_pd_bills(cleaned: pd.DataFrame) -> pd.DataFrame:
         "Team/Performer": full,
         "Memo":           full,
         "Total Cost":     src["Total Adjustment"],
-        "Seasons":        "",
+        "Seasons":        src["Vendor"].map(_season_tag),
         "_display_label": src["Company"].map(file_label),   # short label for per-company split
     })
     # Deterministic order: by company, then date, vendor, memo.

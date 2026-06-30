@@ -1167,3 +1167,39 @@ def test_excluded_qbo_company_dropped_even_if_in_master(tmp_path):
     assert "Damona & Crew" not in set(m.values())
     assert "YS Needle Tickets" not in set(m.values())
     assert m.get("y&s") == "Y&S Tickets"
+
+
+def test_season_tag_values():
+    # Vendor-based auto-tag, ported from the Purchase Details app.
+    assert processor._season_tag("Live Nation Extras") == "LN Extras"
+    assert processor._season_tag("Live Nation The Fillmore Detroit") == "Live Nation"
+    assert processor._season_tag("Broadway Extras") == "Broadway Extras"
+    assert processor._season_tag("Broadway Across America") == "Broadway"
+    assert processor._season_tag("Ticketmaster") == ""
+    assert processor._season_tag("Boston Red Sox") == ""
+
+
+def test_seasons_autotagged_on_bills_and_inventory_asset_expense_lines():
+    rows = [
+        # Concert Extras -> "Live Nation Extras"; positive adjustment -> bill
+        _row(PurchaseOrderID=1, CompanyName="YSA", Vendor="Concert Extras",
+             VenueName="Some Arena", PerformerName="Act", AccountEmail="a@b.com",
+             InitialTicketCostTotal=0, TicketCostTotal=100),
+        # Concert Extras; negative adjustment -> expense pair (Line A + offset)
+        _row(PurchaseOrderID=2, CompanyName="YSA", Vendor="Concert Extras",
+             VenueName="Some Arena", PerformerName="Act2", AccountEmail="c@d.com",
+             InitialTicketCostTotal=100, TicketCostTotal=20),
+    ]
+    cleaned, _ = processor.transform(_norm(rows))
+    assert (cleaned["Vendor"] == "Live Nation Extras").all()   # sanity
+
+    bills, expenses = processor._build_bills_and_expenses(cleaned)
+    assert "Seasons" in bills.columns and "Seasons" in expenses.columns
+    assert (bills["Seasons"] == "LN Extras").all()             # bill tagged
+    ia = expenses[expenses["Category"] == "Inventory Asset"]
+    off = expenses[expenses["Category"] != "Inventory Asset"]
+    assert (ia["Seasons"] == "LN Extras").all()                # inventory-asset leg tagged
+    assert (off["Seasons"] == "").all()                        # offset leg blank
+
+    pdb = processor.build_pd_bills(cleaned)                     # PD bills tagged too
+    assert (pdb["Seasons"] == "LN Extras").all()
