@@ -1267,3 +1267,13 @@ def test_wnba_season_ticket_tagged():
     res = processor.process_files([(_to_xlsx_bytes(rows), "PO_Cost_Changes_2026-06-29.xlsx")])
     pdb = processor.build_pd_bills(res["_cleaned"])
     assert (pdb["Seasons"] == "WNBA").all()
+
+
+def test_date_range_month_day_format():
+    import pandas as pd
+    assert processor._format_date_range([pd.Timestamp("2026-06-29")]) == "6-29"
+    assert processor._format_date_range(
+        [pd.Timestamp("2026-05-01"), pd.Timestamp("2026-05-03")]) == "5-1 thru 5-3"
+    # unsorted input still renders as an ascending span
+    assert processor._format_date_range(
+        [pd.Timestamp("2026-05-03"), pd.Timestamp("2026-05-01")]) == "5-1 thru 5-3"
