@@ -467,26 +467,21 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def _ordinal(n: int) -> str:
-    """1 -> '1st', 11 -> '11th', 22 -> '22nd'."""
-    if 11 <= (n % 100) <= 13:
-        return f"{n}th"
-    return f"{n}{ {1:'st', 2:'nd', 3:'rd'}.get(n % 10, 'th') }"
-
-
 def _format_date_range(dates: list[pd.Timestamp]) -> str:
-    """e.g. 'May 1st thru May 3rd 2026' — same shape as the reference project."""
-    valid = [d for d in dates if pd.notna(d)]
+    """Month-day format used in output filenames and the UI date-range badge,
+    e.g. '6-29' for a single day or '5-1 thru 5-3' for a span. No leading zeros
+    and no year. Falls back to today's month-day when there are no dates."""
+    valid = sorted(d for d in dates if pd.notna(d))
     if not valid:
-        return date.today().strftime("%B %Y")
-    valid = sorted(valid)
+        t = date.today()
+        return f"{t.month}-{t.day}"
 
     def fmt(d):
-        return f"{d.strftime('%B')} {_ordinal(d.day)}"
+        return f"{d.month}-{d.day}"
 
-    if len(valid) == 1 or valid[0] == valid[-1]:
-        return f"{fmt(valid[0])} {valid[0].strftime('%Y')}"
-    return f"{fmt(valid[0])} thru {fmt(valid[-1])} {valid[-1].strftime('%Y')}"
+    if valid[0] == valid[-1]:
+        return fmt(valid[0])
+    return f"{fmt(valid[0])} thru {fmt(valid[-1])}"
 
 
 # ── New-export schema ──────────────────────────────────────────────────────
@@ -1692,7 +1687,7 @@ def process_files(
 
     Returns:
         {
-          "date_range": "May 1st thru May 3rd 2026",
+          "date_range": "5-1 thru 5-3",
           "combined": <xlsx bytes>,                        # multi-tab workbook
           "companies": {label: <xlsx bytes>, ...},          # only labels with data
           "all_companies": [...],                           # all QBO labels, sorted
