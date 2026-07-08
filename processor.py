@@ -103,14 +103,13 @@ DISPLAY_ORDER: list[str] = [
     "Pollak",
     "Levine",
     "Levovitz",
-    "GK",
-    "Ticket Guy",
     "Chase",
     "Asher",       # YSA's display label (Company value remains "YSA")
     "Katz",
-    "Needle",      # not in reference; slotted with the other affiliates
+    "GK",
     "TL",
     "Waxler",
+    "Ticket Guy",
     "YourTickets",  # always last
 ]
 
@@ -366,7 +365,9 @@ def transform(
     )
 
     # 9. Filtered Rows — drop zero-impact rows (per the M code's behavior;
-    #    further zero-sum aggregates are filtered again after step 12).
+    #    further zero-sum aggregates are filtered again after step 12). Round to
+    #    whole cents first so floating-point residue collapses to exactly 0.
+    out["Total Adjustment"] = out["Total Adjustment"].round(2)
     out = out[out["Total Adjustment"] != 0].reset_index(drop=True)
 
     # 11. Cancelled is no longer needed beyond this point (step 8 has already
@@ -396,6 +397,10 @@ def transform(
 
         # Filter zero-sum aggregates: separate +/− entries on the same key
         # can cancel out. They have no QBO impact, so drop them.
+        # Round to whole cents so floating-point residue on a net-zero group
+        # (e.g. +213.15 − 42.63 − 170.52 ≈ 1e-14) collapses to exactly 0 and is
+        # dropped here instead of surfacing as a $0.00 bill.
+        out["Total Adjustment"] = out["Total Adjustment"].round(2)
         out = out[out["Total Adjustment"] != 0].reset_index(drop=True)
 
     # 13. Sort for stable output: by display order (Company), then date.
