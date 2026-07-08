@@ -1277,3 +1277,25 @@ def test_date_range_month_day_format():
     # unsorted input still renders as an ascending span
     assert processor._format_date_range(
         [pd.Timestamp("2026-05-03"), pd.Timestamp("2026-05-01")]) == "5-1 thru 5-3"
+
+
+def test_net_zero_adjustment_creates_no_bill():
+    # 3 seat changes on one PO that net to $0 (the third is a cancellation).
+    # The End-Start float residue (~2.8e-14) previously survived the zero-filter
+    # and surfaced as a $0.00 bill; rounding to cents must drop it entirely.
+    common = dict(CompanyName="YSA", Vendor="New York Red Bulls",
+                  PerformerName="New York Red Bulls", AccountEmail="e@x.com",
+                  CreatedDate=None)
+    rows = [
+        _row(PurchaseOrderID=2117631, Section="233", Row="6", StartSeat=8, EndSeat=20,
+             InitialTicketCostTotal=596.82, TicketCostTotal=554.19, **common),
+        _row(PurchaseOrderID=2117631, Section="233", Row="4", StartSeat=21, EndSeat=37,
+             InitialTicketCostTotal=511.56, TicketCostTotal=724.71, **common),
+        _row(PurchaseOrderID=2117631, Section="233", Row="4", StartSeat=34, EndSeat=37,
+             InitialTicketCostTotal=170.52, TicketCostTotal=170.52, IsCancelled=True, **common),
+    ]
+    res = processor.process_files([(_to_xlsx_bytes(rows), "PO_Cost_Changes_2026-07-06.xlsx")])
+    assert res["_cleaned"].empty
+    bills, expenses = processor._build_bills_and_expenses(res["_cleaned"])
+    assert bills.empty and expenses.empty
+    assert processor.build_pd_bills(res["_cleaned"]).empty
