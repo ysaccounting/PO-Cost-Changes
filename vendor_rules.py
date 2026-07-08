@@ -9,7 +9,7 @@ schema. The transformation order matters and mirrors the source exactly:
      companies only, Live Nation -> Concert Seasons.
   1. Ticketmaster AM / Ballpark -> team name (if major-league team) else Venue.
   2. VENDOR_REPLACEMENTS substring replacements (+ the two prepended rules).
-  3. Sports Extras -> Venue.
+  3. Sports Extras -> Venue (except Radio City Music Hall -> Madison Square Garden).
   4. Ticket Guy box-office: Default Vendor -> BROADWAY_VENUES[Venue]
      (or "Box Office - New World Stages").
   5. Concert Seasons -> CONCERT_SEASONS_MAP[Venue].
@@ -384,13 +384,14 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     df["Vendor"] = [resolve_tm_am(i) for i in range(len(df))]
 
     # 1b. Concert Extras at a Madison Square Garden Entertainment venue ->
-    #     "Madison Square Garden". Covers MSG itself (and its parking lots),
-    #     Radio City Music Hall, and the Beacon Theatre. This overrides the
-    #     general "Concert Extras" -> "Live Nation Extras" rename done in stage 2.
+    #     "Madison Square Garden". Covers MSG itself (and its parking lots) and
+    #     the Beacon Theatre. This overrides the general "Concert Extras" ->
+    #     "Live Nation Extras" rename done in stage 2. (Radio City Music Hall is
+    #     intentionally NOT here — Concert Extras there falls through to
+    #     "Live Nation Extras" like any other Concert Extras.)
     msg_venues = {
         "madison square garden",
         "madison square garden parking lots",
-        "radio city music hall",
         "beacon theatre - new york",
     }
     msg_mask = (df["Vendor"] == "Concert Extras") & venue.str.lower().isin(msg_venues)
@@ -399,7 +400,11 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     # 2. Substring replacements.
     df = _apply_vendor_replacements(df)
 
-    # 3. Sports Extras -> venue.
+    # 3. Sports Extras -> venue, EXCEPT at Radio City Music Hall, which is
+    #    attributed to "Madison Square Garden" (this override runs first so the
+    #    general venue rule below doesn't fire for it).
+    rcmh_mask = (df["Vendor"].astype(str) == "Sports Extras") & (venue.str.lower() == "radio city music hall")
+    df.loc[rcmh_mask, "Vendor"] = "Madison Square Garden"
     df["Vendor"] = np.where(
         df["Vendor"].astype(str) == "Sports Extras", venue.values, df["Vendor"].astype(str)
     )

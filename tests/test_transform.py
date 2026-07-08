@@ -308,14 +308,33 @@ def test_axs_substring_replacement_to_veritix():
 
 
 def test_concert_extras_at_msg_becomes_madison_square_garden():
-    # At any MSG Entertainment venue (MSG + its parking lots, Radio City Music
-    # Hall, Beacon Theatre), Concert Extras -> "Madison Square Garden",
-    # overriding the general Concert Extras -> Live Nation Extras rule.
+    # Concert Extras -> "Madison Square Garden" at MSG (+ its parking lots) and
+    # the Beacon Theatre, overriding the general Concert Extras -> Live Nation
+    # Extras rule.
     for ven in ("Madison Square Garden", "Madison Square Garden Parking Lots",
-                "Radio City Music Hall", "Beacon Theatre - New York"):
+                "Beacon Theatre - New York"):
         v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
                                 VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
         assert v == ["Madison Square Garden"], ven
+
+
+def test_radio_city_music_hall_vendor_rules():
+    # Radio City is NOT an MSG venue for Concert Extras: it falls through to the
+    # general Concert Extras -> Live Nation Extras rule.
+    v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
+                            VenueName="Radio City Music Hall",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Live Nation Extras"]
+    # But Sports Extras at Radio City IS attributed to Madison Square Garden.
+    v = _final_vendor([_row(Vendor="Sports Extras", PerformerName="Some Act",
+                            VenueName="Radio City Music Hall",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Madison Square Garden"]
+    # Sports Extras elsewhere still resolves to the venue name.
+    v = _final_vendor([_row(Vendor="Sports Extras", PerformerName="Some Act",
+                            VenueName="Some Other Arena",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Some Other Arena"]
 
 
 def test_concert_extras_elsewhere_still_live_nation_extras():
