@@ -5,8 +5,8 @@ This is a faithful port of that app's vendor pipeline (see its
 schema. The transformation order matters and mirrors the source exactly:
 
   0. Pre-map fixes: Box Office -> Default Vendor; Live Nation Flex ->
-     Concert Seasons; Broadway Groups -> Broadway Seasons; and for YSA
-     companies only, Live Nation -> Concert Seasons.
+     Concert Seasons; and for YSA companies only, Live Nation -> Concert
+     Seasons. ("Broadway Groups" is left as-is — see rule 0 in the code.)
   1. Ticketmaster AM / Ballpark -> team name (if major-league team) else Venue.
   2. VENDOR_REPLACEMENTS substring replacements (+ the two prepended rules).
   3. Sports Extras -> Venue (except Radio City Music Hall -> Madison Square Garden).
@@ -369,7 +369,10 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
         return str(name).strip().lower() in teams
 
     # 0. Pre-map fixes.
-    df["Vendor"] = df["Vendor"].replace("Broadway Groups", "Broadway Seasons")
+    #    NOTE: "Broadway Groups" is intentionally left as-is. It used to be
+    #    rewritten to "Broadway Seasons" here, which then sent it through rule 6
+    #    and resolved it to a venue-specific name ("Broadway Boston", etc.). It
+    #    should stay "Broadway Groups".
     ysa_mask = orig.isin(YSA_COMPANIES) & (df["Vendor"] == "Live Nation")
     df.loc[ysa_mask, "Vendor"] = "Concert Seasons"
 

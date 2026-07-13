@@ -1318,3 +1318,19 @@ def test_net_zero_adjustment_creates_no_bill():
     bills, expenses = processor._build_bills_and_expenses(res["_cleaned"])
     assert bills.empty and expenses.empty
     assert processor.build_pd_bills(res["_cleaned"]).empty
+
+
+def test_broadway_groups_stays_broadway_groups():
+    # Raw vendor "Broadway Groups" must NOT be rewritten to "Broadway Seasons"
+    # (which would then resolve to a venue-specific name like "Broadway Boston").
+    for ven in ("Boston Opera House", "Hollywood Pantages Theatre", "Some Random Theatre"):
+        v = _final_vendor([_row(Vendor="Broadway Groups", PerformerName="Some Show",
+                                VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
+        assert v == ["Broadway Groups"], ven
+    # A genuine "Broadway Seasons" vendor still maps by venue, as before.
+    v = _final_vendor([_row(Vendor="Broadway Seasons", PerformerName="Some Show",
+                            VenueName="Boston Opera House",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Broadway Boston"]
+    # And Broadway Groups carries the general "Broadway" Seasons tag.
+    assert processor._season_tag("Broadway Groups") == "Broadway"
