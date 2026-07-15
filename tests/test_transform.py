@@ -1334,3 +1334,25 @@ def test_broadway_groups_stays_broadway_groups():
     assert v == ["Broadway Boston"]
     # And Broadway Groups carries the general "Broadway" Seasons tag.
     assert processor._season_tag("Broadway Groups") == "Broadway"
+
+
+def test_combined_only_skips_individual_files():
+    # combined_only builds ONLY the combined workbook (which still contains all
+    # tabs); the separate per-company Expenses/Bills files are skipped.
+    import mapping, teams
+    mapping.reset_cache(); teams.reset_cache()
+    raw = open("/mnt/user-data/uploads/PO_Cost_Changes_2026-06-22.xlsx", "rb").read()
+    res = processor.process_files([(raw, "PO_Cost_Changes_2026-06-22.xlsx")])
+    args = (res["_cleaned"], res["_source_view"], res["_excluded_view"],
+            res["date_range"], res["all_companies"])
+
+    full = processor.build_filtered_outputs(*args)
+    combo = processor.build_filtered_outputs(*args, combined_only=True)
+
+    assert full["companies"] and full["bills_files"]        # normal run has them
+    assert combo["companies"] == {} and combo["bills_files"] == {}
+    assert combo["combined"]                                # combined still produced
+    # combined workbook still carries the per-company + Bills tabs
+    import io, openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(combo["combined"]))
+    assert "Bills" in wb.sheetnames and "Combined" in wb.sheetnames

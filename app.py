@@ -220,9 +220,12 @@ def status(job_id):
     })
 
 
-def run_configure(job_id: str, selected: list[str]) -> None:
+def run_configure(job_id: str, selected: list[str], combined_only: bool = False) -> None:
     """Background worker: build the selected companies' output files, reporting
-    per-file progress to configure.json, then record which are downloadable."""
+    per-file progress to configure.json, then record which are downloadable.
+
+    When `combined_only` is set, only the combined workbook is built (no separate
+    per-company Expenses/Bills files) — much faster for a full-month run."""
     try:
         write_configure_status(job_id, {"status": "generating", "done": 0, "total": 0})
         meta = read_meta(job_id)
@@ -236,6 +239,7 @@ def run_configure(job_id: str, selected: list[str]) -> None:
         out = build_filtered_outputs(
             dfs["cleaned"], dfs["source_view"], dfs["excluded_view"],
             dfs["date_range"], selected, progress_cb=progress,
+            combined_only=combined_only,
         )
 
         with open(os.path.join(d, "combined.xlsx"), "wb") as f:
@@ -262,6 +266,7 @@ def run_configure(job_id: str, selected: list[str]) -> None:
                 f.write(file_bytes)
 
         meta["selected_companies"] = selected
+        meta["combined_only"] = combined_only
         meta["companies"] = list(out["companies"].keys())
         meta["bills_companies"] = list(out["bills_files"].keys())
         with open(os.path.join(d, "meta.json"), "w") as f:
@@ -274,6 +279,7 @@ def run_configure(job_id: str, selected: list[str]) -> None:
             "total": total,
             "date_range": meta["date_range"],
             "selected_companies": selected,
+            "combined_only": combined_only,
             "companies": meta["companies"],
             "bills_companies": meta["bills_companies"],
             "stats": meta.get("stats", {}),
@@ -295,10 +301,15 @@ def configure(job_id):
         return jsonify({"error": "Job data not found"}), 404
 
     data = request.get_json(silent=True) or {}
-    selected = data.get("selected_companies", meta.get("all_companies", []))
+    combined_only = bool(data.get("combined_only", False))
+    if combined_only:
+        # Combined includes everyone; ignore any per-company selection.
+        selected = meta.get("all_companies", [])
+    else:
+        selected = data.get("selected_companies", meta.get("all_companies", []))
 
     write_configure_status(job_id, {"status": "generating", "done": 0, "total": 0})
-    threading.Thread(target=run_configure, args=(job_id, selected), daemon=True).start()
+    threading.Thread(target=run_configure, args=(job_id, selected, combined_only), daemon=True).start()
     return jsonify({"status": "generating"})
 
 

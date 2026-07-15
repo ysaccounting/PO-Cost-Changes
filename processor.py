@@ -1889,6 +1889,7 @@ def build_filtered_outputs(
     date_range: str,
     selected_companies: list[str],
     progress_cb=None,
+    combined_only: bool = False,
 ) -> dict:
     """Build the output files for the chosen companies only.
 
@@ -1903,10 +1904,16 @@ def build_filtered_outputs(
 
     `selected_companies` are the short sheet/file labels (e.g. "GK", "Y&S").
 
+    When `combined_only` is True, only the combined workbook is built (which
+    already contains every tab, including per-company and Bills tabs); the
+    separate per-company Expenses/Bills files are skipped entirely. This is much
+    faster for a full-month run — the callers pass every company so the combined
+    covers them all. "companies"/"bills_files" come back empty.
+
     `progress_cb`, if given, is called `progress_cb(done, total)` after the
     combined workbook and after each per-company file is built, so callers can
     show generation progress. `total` = 1 (combined) + #expense files + #bills
-    files for the selection.
+    files for the selection (just 1 when `combined_only`).
     """
     selected = set(selected_companies)
 
@@ -1930,7 +1937,7 @@ def build_filtered_outputs(
         {str(v) for v in pd_bills["_display_label"].unique()} & selected
         if not pd_bills.empty else set()
     )
-    total = 1 + len(expense_labels) + len(bills_label_set)
+    total = 1 if combined_only else 1 + len(expense_labels) + len(bills_label_set)
     done = 0
 
     def _tick():
@@ -1947,6 +1954,10 @@ def build_filtered_outputs(
         pd_bills_df=pd_bills,
     )
     _tick()
+
+    # Combined-only fast path: skip the per-company Expenses/Bills files.
+    if combined_only:
+        return {"combined": combined_bytes, "companies": {}, "bills_files": {}}
 
     def _company_ledger(name: str) -> pd.DataFrame:
         b = bills_df[bills_df["_display_label"] == name] if "_display_label" in bills_df.columns else bills_df.iloc[0:0]

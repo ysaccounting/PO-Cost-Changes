@@ -112,11 +112,6 @@
       letter-spacing: 0;
     }
 
-    /* Space the results-screen warning off the Download All button below it. */
-    .upload-warning + .download-btn {
-      margin-top: 16px;
-    }
-
     .upload-warning-users {
       margin-top: 10px;
       display: grid;
@@ -341,6 +336,14 @@
       background: #f8f8f8; border-bottom: 1px solid #e0e0e0; cursor: pointer;
     }
     .modal-select-all-row label { font-size: 13px; font-weight: 600; cursor: pointer; color: #1a1a2e; }
+    .modal-combined-only-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 14px; margin-bottom: 14px;
+      background: #eef0fb; border: 1px solid #d7dbf5; border-radius: 10px;
+      cursor: pointer;
+    }
+    .modal-combined-only-row input[type=checkbox] { margin-top: 2px; flex: none; width: 16px; height: 16px; cursor: pointer; }
+    .modal-combined-only-row span { font-size: 13px; color: #1a1a2e; line-height: 1.4; }
     #modal-company-list { max-height: 280px; overflow-y: auto; }
     .modal-company-row {
       display: flex; align-items: center; gap: 10px; padding: 9px 14px;
@@ -381,16 +384,11 @@
       font-size: 13px; color: #c0392b; font-weight: 600;
     }
     #remove-warn-files li { margin: 2px 0; word-break: break-all; }
-    #remove-warn-back, #remove-warn-proceed {
+    #remove-warn-ok {
       padding: 9px 22px; font-size: 13px; font-weight: 600; border-radius: 10px;
-      cursor: pointer;
+      background: #3f51b5; color: #fff; border: none; cursor: pointer;
     }
-    /* Go Back is the recommended (primary) action; Proceed Anyway is the
-       cautionary (secondary) one. */
-    #remove-warn-back { background: #2e7d32; color: #fff; border: none; }
-    #remove-warn-back:hover { background: #1b5e20; }
-    #remove-warn-proceed { background: #fff; color: #c0392b; border: 1px solid #c0392b; }
-    #remove-warn-proceed:hover { background: #fdecea; }
+    #remove-warn-ok:hover { background: #303f9f; }
     /* Zone 1 — convert (optional) */
     .zone-divider { height: 1px; background: #eee; margin: 28px 0 0; }
     #convert-drop-zone {
@@ -573,6 +571,10 @@
       <span id="modal-sel-count"></span>
     </div>
     <p class="modal-sub">Choose which companies to include in the output files.</p>
+    <label class="modal-combined-only-row" for="modal-combined-only">
+      <input type="checkbox" id="modal-combined-only" onchange="onCombinedOnlyToggle()" />
+      <span><strong>Combined file only</strong> — include all companies, skip individual files (fastest)</span>
+    </label>
     <div class="modal-list-wrap">
       <label class="modal-select-all-row" for="modal-select-all">
         <input type="checkbox" id="modal-select-all" />
@@ -584,22 +586,17 @@
       <button id="modal-cancel-btn" onclick="cancelSelection()">Cancel</button>
       <button id="modal-generate-btn" onclick="generateFiles()" disabled>Generate files</button>
     </div>
-    <div id="modal-progress" style="display:none; margin-top:16px;">
-      <div class="progress-bar-wrap"><div class="progress-bar" id="modal-progress-bar"></div></div>
-      <p id="modal-progress-text" class="modal-sub" style="text-align:center; margin:0;">Generating files…</p>
-    </div>
   </div>
 </div>
 
 <div id="remove-warn-overlay">
   <div id="remove-warn-box">
     <h2>“Remove” column missing</h2>
-    <p>A <strong>Remove</strong> column wasn’t found in:</p>
+    <p>Processing is blocked. The required <strong>Remove</strong> column wasn’t found in:</p>
     <ul id="remove-warn-files"></ul>
-    <p>Go back to add a <strong>Remove</strong> column (put an <strong>X</strong> on each accounting-team cost-change line already entered in QBO), or proceed anyway to process every row as-is.</p>
+    <p>Add a <strong>Remove</strong> column (put an <strong>X</strong> on each accounting-team cost-change line already entered in QBO) to each file listed above, then try again.</p>
     <div class="modal-actions">
-      <button id="remove-warn-back">Go Back</button>
-      <button id="remove-warn-proceed">Proceed Anyway</button>
+      <button id="remove-warn-ok">OK</button>
     </div>
   </div>
 </div>
@@ -621,7 +618,6 @@
   let ccFiles = [];   // PO Cost Changes files staged
   let _jobId = null;  // job awaiting company selection
   let _data = null;   // status payload for that job
-  let _cfgTimer = null;  // poll timer for the file-generation (configure) step
 
   // ── Zone 1: reformat a raw export into the Converted layout ─────────────
   (function setupConvert() {
@@ -787,7 +783,6 @@
     document.getElementById("modal-overlay").classList.remove("active");
     document.getElementById("remove-warn-overlay").classList.remove("active");
     clearInterval(pollTimer);
-    if (_cfgTimer) { clearInterval(_cfgTimer); _cfgTimer = null; }
     resultsArea.style.display = "none";
     statusArea.style.display = "none";
     errorBox.style.display = "none";
@@ -824,16 +819,14 @@
     resetBtn.style.display = "block";
   }
 
-  async function startProcessing(force = false) {
+  async function startProcessing() {
     if (ccFiles.length === 0) return;
     errorBox.style.display = "none";
 
     // Upload + validate first; stay on the upload screen until we know every
-    // file has a Remove column. A missing column shows a dialog where the user
-    // can go back and add it, or proceed anyway (re-runs this with force=true).
+    // file has a Remove column. A missing column hard-blocks here.
     const formData = new FormData();
     ccFiles.forEach(f => formData.append("file", f));
-    if (force) formData.append("force", "true");
 
     let res, data;
     try {
@@ -896,12 +889,8 @@
     });
     document.getElementById("remove-warn-overlay").classList.add("active");
   }
-  document.getElementById("remove-warn-back").addEventListener("click", () => {
+  document.getElementById("remove-warn-ok").addEventListener("click", () => {
     document.getElementById("remove-warn-overlay").classList.remove("active");
-  });
-  document.getElementById("remove-warn-proceed").addEventListener("click", () => {
-    document.getElementById("remove-warn-overlay").classList.remove("active");
-    startProcessing(true);   // re-run, bypassing the Remove-column check
   });
 
   function showModal(jobId, data) {
@@ -932,6 +921,11 @@
     const sa = document.getElementById("modal-select-all");
     sa.checked = false;
     sa.indeterminate = false;
+    // Combined-only starts off; re-enable the company list in case a prior run left it disabled.
+    const co = document.getElementById("modal-combined-only");
+    if (co) co.checked = false;
+    const wrap = document.querySelector(".modal-list-wrap");
+    if (wrap) { wrap.style.opacity = ""; wrap.style.pointerEvents = ""; }
     sa.onchange = function() {
       document.querySelectorAll("#modal-company-list input[type=checkbox]").forEach(cb => {
         cb.checked = this.checked;
@@ -940,27 +934,33 @@
     };
 
     updateModalCount();
-
-    // Reset generation UI/state so a fresh (or repeat) selection starts clean.
-    if (_cfgTimer) { clearInterval(_cfgTimer); _cfgTimer = null; }
-    document.getElementById("modal-progress").style.display = "none";
-    document.getElementById("modal-progress-bar").style.width = "0%";
-    document.getElementById("modal-cancel-btn").disabled = false;
-    const genBtn = document.getElementById("modal-generate-btn");
-    genBtn.textContent = "Generate files";
-
     document.getElementById("modal-overlay").classList.add("active");
   }
 
+  function onCombinedOnlyToggle() {
+    const on = document.getElementById("modal-combined-only").checked;
+    const wrap = document.querySelector(".modal-list-wrap");
+    if (wrap) {
+      // Grey out / disable the per-company list — combined-only includes everyone.
+      wrap.style.opacity = on ? "0.45" : "";
+      wrap.style.pointerEvents = on ? "none" : "";
+    }
+    updateModalCount();
+  }
+
   function updateModalCount() {
+    const combinedOnly = document.getElementById("modal-combined-only") &&
+                         document.getElementById("modal-combined-only").checked;
     const cbs = document.querySelectorAll("#modal-company-list input[type=checkbox]");
     const total = cbs.length;
     const checked = [...cbs].filter(c => c.checked).length;
-    document.getElementById("modal-sel-count").textContent = `${checked} of ${total} selected`;
+    document.getElementById("modal-sel-count").textContent =
+      combinedOnly ? "Combined file only" : `${checked} of ${total} selected`;
     const sa = document.getElementById("modal-select-all");
     sa.checked = checked === total && total > 0;
     sa.indeterminate = checked > 0 && checked < total;
-    document.getElementById("modal-generate-btn").disabled = checked === 0;
+    // Generate is enabled when combined-only is on, or at least one company is picked.
+    document.getElementById("modal-generate-btn").disabled = combinedOnly ? false : (checked === 0);
   }
 
   function closeModal() {
@@ -973,80 +973,43 @@
   }
 
   async function generateFiles() {
+    const combinedOnly = document.getElementById("modal-combined-only") &&
+                         document.getElementById("modal-combined-only").checked;
     const selected = [...document.querySelectorAll("#modal-company-list input[type=checkbox]")]
       .filter(cb => cb.checked).map(cb => cb.value);
-    if (selected.length === 0) return;
+    if (!combinedOnly && selected.length === 0) return;
 
-    const btn       = document.getElementById("modal-generate-btn");
-    const cancelBtn = document.getElementById("modal-cancel-btn");
-    const prog      = document.getElementById("modal-progress");
-    const bar       = document.getElementById("modal-progress-bar");
-    const text      = document.getElementById("modal-progress-text");
-
-    // Lock the modal while generating, and show the progress bar.
+    const btn = document.getElementById("modal-generate-btn");
     btn.disabled = true;
     btn.textContent = "Generating…";
-    cancelBtn.disabled = true;
-    document.querySelectorAll("#modal-company-list input[type=checkbox], #modal-select-all")
-      .forEach(c => c.disabled = true);
-    prog.style.display = "block";
-    bar.style.width = "0%";
-    text.textContent = "Generating files…";
-
-    // Kick off the background build, then poll for per-file progress.
     try {
       const res = await fetch(`/configure/${_jobId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selected_companies: selected }),
+        body: JSON.stringify(combinedOnly ? { combined_only: true }
+                                          : { selected_companies: selected }),
       });
-      const ack = await res.json();
-      if (ack.status === "error" || ack.error) {
-        failGenerate(ack.message || ack.error || "Unknown error");
+      const result = await res.json();
+      if (result.status !== "ready") {
+        closeModal();
+        showError("Error generating files: " + (result.message || "Unknown error"));
         return;
       }
+      closeModal();
+      showResults(_jobId, {
+        ..._data,
+        combined_only: combinedOnly,
+        selected_companies: result.selected_companies,
+        companies: result.companies,
+        bills_companies: result.bills_companies,
+      });
     } catch (e) {
-      failGenerate("Failed to start file generation.");
-      return;
+      closeModal();
+      showError("Failed to generate files. Please try again.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Generate files";
     }
-
-    if (_cfgTimer) clearInterval(_cfgTimer);
-    _cfgTimer = setInterval(async () => {
-      let st;
-      try {
-        st = await (await fetch(`/configure_status/${_jobId}`)).json();
-      } catch (e) {
-        return;  // transient; try again next tick
-      }
-      if (st.status === "generating") {
-        const total = st.total || 0, done = st.done || 0;
-        if (total > 0) {
-          bar.style.width = Math.round(done / total * 100) + "%";
-          text.textContent = `Generating files… ${done} of ${total}`;
-        }
-      } else if (st.status === "ready") {
-        clearInterval(_cfgTimer); _cfgTimer = null;
-        bar.style.width = "100%";
-        text.textContent = `Generating files… ${st.total} of ${st.total}`;
-        closeModal();
-        showResults(_jobId, {
-          ..._data,
-          selected_companies: st.selected_companies,
-          companies: st.companies,
-          bills_companies: st.bills_companies,
-        });
-      } else if (st.status === "error") {
-        clearInterval(_cfgTimer); _cfgTimer = null;
-        failGenerate(st.message || "Unknown error");
-      }
-      // "not_found" → status file not written yet; keep waiting.
-    }, 250);
-  }
-
-  function failGenerate(msg) {
-    if (_cfgTimer) { clearInterval(_cfgTimer); _cfgTimer = null; }
-    closeModal();
-    showError("Error generating files: " + msg);
   }
 
   function showResults(jobId, data) {
@@ -1068,6 +1031,17 @@
     document.getElementById("date-badge").textContent = data.date_range;
     document.getElementById("btn-zip").href = `/download/${jobId}/all`;
     document.getElementById("btn-combined").href = `/download/${jobId}/combined`;
+
+    // Combined-only: only the combined workbook exists, so hide the zip and the
+    // per-company Expenses/Bills download sections.
+    const combinedOnly = !!data.combined_only;
+    const zipBtn = document.getElementById("btn-zip");
+    if (zipBtn) zipBtn.style.display = combinedOnly ? "none" : "";
+    const expGrid = document.getElementById("company-grid");
+    const expLabel = expGrid ? expGrid.previousElementSibling : null;
+    if (expGrid) expGrid.style.display = combinedOnly ? "none" : "";
+    if (expLabel && expLabel.classList.contains("section-label"))
+      expLabel.style.display = combinedOnly ? "none" : "";
 
     // Excluded banner — show if any rows were removed via the Remove=X flag.
     const excluded = data.excluded || {row_count: 0, po_count: 0, total_adjustment: 0};
