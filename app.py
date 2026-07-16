@@ -287,7 +287,8 @@ def run_configure(job_id: str, selected: list[str], combined_only: bool = False)
         log.info("Configure %s ready (%d files)", job_id, total)
     except Exception as e:
         log.exception("Configure %s failed", job_id)
-        write_configure_status(job_id, {"status": "error", "message": str(e)})
+        write_configure_status(job_id, {"status": "error",
+                                        "message": str(e) or repr(e) or type(e).__name__})
 
 
 @app.route("/configure/<job_id>", methods=["POST"])

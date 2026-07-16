@@ -384,11 +384,16 @@
       font-size: 13px; color: #c0392b; font-weight: 600;
     }
     #remove-warn-files li { margin: 2px 0; word-break: break-all; }
-    #remove-warn-ok {
+    #remove-warn-back {
       padding: 9px 22px; font-size: 13px; font-weight: 600; border-radius: 10px;
-      background: #3f51b5; color: #fff; border: none; cursor: pointer;
+      background: #2e7d32; color: #fff; border: none; cursor: pointer;
     }
-    #remove-warn-ok:hover { background: #303f9f; }
+    #remove-warn-back:hover { background: #27682b; }
+    #remove-warn-proceed {
+      padding: 9px 22px; font-size: 13px; font-weight: 600; border-radius: 10px;
+      background: #fff; color: #c0392b; border: 1px solid #c0392b; cursor: pointer;
+    }
+    #remove-warn-proceed:hover { background: #fdecea; }
     /* Zone 1 — convert (optional) */
     .zone-divider { height: 1px; background: #eee; margin: 28px 0 0; }
     #convert-drop-zone {
@@ -592,11 +597,12 @@
 <div id="remove-warn-overlay">
   <div id="remove-warn-box">
     <h2>“Remove” column missing</h2>
-    <p>Processing is blocked. The required <strong>Remove</strong> column wasn’t found in:</p>
+    <p>The required <strong>Remove</strong> column wasn’t found in:</p>
     <ul id="remove-warn-files"></ul>
-    <p>Add a <strong>Remove</strong> column (put an <strong>X</strong> on each accounting-team cost-change line already entered in QBO) to each file listed above, then try again.</p>
+    <p>Add a <strong>Remove</strong> column (put an <strong>X</strong> on each accounting-team cost-change line already entered in QBO) to each file listed above, then try again — or proceed anyway to process every row as-is.</p>
     <div class="modal-actions">
-      <button id="remove-warn-ok">OK</button>
+      <button id="remove-warn-back">Go Back</button>
+      <button id="remove-warn-proceed">Proceed Anyway</button>
     </div>
   </div>
 </div>
@@ -819,14 +825,16 @@
     resetBtn.style.display = "block";
   }
 
-  async function startProcessing() {
+  async function startProcessing(force = false) {
     if (ccFiles.length === 0) return;
     errorBox.style.display = "none";
 
-    // Upload + validate first; stay on the upload screen until we know every
-    // file has a Remove column. A missing column hard-blocks here.
+    // Upload + validate first. A file missing its Remove column raises a soft
+    // block the user can override with "Proceed Anyway" (force=true), which
+    // re-submits and processes every row as-is.
     const formData = new FormData();
     ccFiles.forEach(f => formData.append("file", f));
+    if (force) formData.append("force", "true");
 
     let res, data;
     try {
@@ -889,8 +897,14 @@
     });
     document.getElementById("remove-warn-overlay").classList.add("active");
   }
-  document.getElementById("remove-warn-ok").addEventListener("click", () => {
+  document.getElementById("remove-warn-back").addEventListener("click", () => {
+    // Go Back — dismiss and let the user add the Remove column.
     document.getElementById("remove-warn-overlay").classList.remove("active");
+  });
+  document.getElementById("remove-warn-proceed").addEventListener("click", () => {
+    // Proceed Anyway — re-submit with force=true so every row is processed as-is.
+    document.getElementById("remove-warn-overlay").classList.remove("active");
+    startProcessing(true);
   });
 
   function showModal(jobId, data) {
@@ -972,6 +986,24 @@
     resetAll();
   }
 
+  async function pollConfigureStatus(jobId, timeoutMs = 300000) {
+    // Poll /configure_status until files are ready or an error is reported.
+    // Used when /configure responds asynchronously. Tolerates transient
+    // network blips and a not-yet-written status file.
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 600));
+      try {
+        const r = await fetch(`/configure_status/${jobId}`);
+        const st = await r.json();
+        if (st.status === "ready" || st.status === "error") return st;
+      } catch (e) {
+        // transient — keep polling
+      }
+    }
+    return { status: "error", message: "timed out waiting for files to generate" };
+  }
+
   async function generateFiles() {
     const combinedOnly = document.getElementById("modal-combined-only") &&
                          document.getElementById("modal-combined-only").checked;
@@ -989,10 +1021,19 @@
         body: JSON.stringify(combinedOnly ? { combined_only: true }
                                           : { selected_companies: selected }),
       });
-      const result = await res.json();
+      let result = await res.json();
+      // The backend may answer synchronously ("ready") or asynchronously
+      // ("generating", then report progress/result via /configure_status).
+      // Handle both so a version skew between page and server can't wedge here.
+      if (result.status === "generating") {
+        result = await pollConfigureStatus(_jobId);
+      }
       if (result.status !== "ready") {
         closeModal();
-        showError("Error generating files: " + (result.message || "Unknown error"));
+        const detail = result.message
+          || `unexpected response (status: ${result.status || "?"}, HTTP ${res.status}). ` +
+             `If this keeps happening, hard-refresh the page (Ctrl/Cmd+Shift+R) and try again.`;
+        showError("Error generating files: " + detail);
         return;
       }
       closeModal();
@@ -1005,7 +1046,7 @@
       });
     } catch (e) {
       closeModal();
-      showError("Failed to generate files. Please try again.");
+      showError("Failed to generate files (" + ((e && e.message) || "network error") + "). Please try again.");
     } finally {
       btn.disabled = false;
       btn.textContent = "Generate files";
