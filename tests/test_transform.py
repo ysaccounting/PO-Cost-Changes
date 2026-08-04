@@ -307,29 +307,23 @@ def test_axs_substring_replacement_to_veritix():
     assert v == ["Veritix"]
 
 
-def test_concert_extras_at_msg_becomes_madison_square_garden():
-    # Concert Extras -> "Madison Square Garden" at MSG (+ its parking lots) and
-    # the Beacon Theatre, overriding the general Concert Extras -> Live Nation
-    # Extras rule.
-    for ven in ("Madison Square Garden", "Madison Square Garden Parking Lots",
-                "Beacon Theatre - New York"):
+def test_concert_extras_at_msg_venues_is_live_nation_extras():
+    # The old MSG special-casing is gone: Concert Extras now becomes "Live Nation
+    # Extras" everywhere, including at MSG Entertainment venues.
+    for ven in ("Madison Square Garden", "Radio City Music Hall",
+                "Beacon Theatre - New York", "Some Other Arena"):
         v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
                                 VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
+        assert v == ["Live Nation Extras"], ven
+
+
+def test_sports_extras_at_msg_venues_is_madison_square_garden():
+    # Sports Extras at any MSG Entertainment venue -> "Madison Square Garden".
+    for ven in ("Madison Square Garden", "Radio City Music Hall",
+                "Beacon Theatre - New York"):
+        v = _final_vendor([_row(Vendor="Sports Extras", PerformerName="Some Act",
+                                VenueName=ven, InitialTicketCostTotal=0, TicketCostTotal=100)])
         assert v == ["Madison Square Garden"], ven
-
-
-def test_radio_city_music_hall_vendor_rules():
-    # Radio City is NOT an MSG venue for Concert Extras: it falls through to the
-    # general Concert Extras -> Live Nation Extras rule.
-    v = _final_vendor([_row(Vendor="Concert Extras", PerformerName="Some Act",
-                            VenueName="Radio City Music Hall",
-                            InitialTicketCostTotal=0, TicketCostTotal=100)])
-    assert v == ["Live Nation Extras"]
-    # But Sports Extras at Radio City IS attributed to Madison Square Garden.
-    v = _final_vendor([_row(Vendor="Sports Extras", PerformerName="Some Act",
-                            VenueName="Radio City Music Hall",
-                            InitialTicketCostTotal=0, TicketCostTotal=100)])
-    assert v == ["Madison Square Garden"]
     # Sports Extras elsewhere still resolves to the venue name.
     v = _final_vendor([_row(Vendor="Sports Extras", PerformerName="Some Act",
                             VenueName="Some Other Arena",
