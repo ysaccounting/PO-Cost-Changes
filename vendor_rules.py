@@ -254,6 +254,7 @@ CONCERT_SEASONS_MAP = {
     'Uptown Theater - Minneapolis': 'Live Nation Uptown Minneapolis',
     'Old National Centre.': 'Live Nation Old National Centre',
     'Sandy Amphitheater': 'Live Nation Sandy Amphitheater',
+    'Truliant Amphitheater': 'Live Nation Truliant Amphitheater',
 }
 
 BROADWAY_SEASONS_MAP = {

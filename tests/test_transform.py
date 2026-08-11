@@ -1350,3 +1350,12 @@ def test_combined_only_skips_individual_files():
     import io, openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(combo["combined"]))
     assert "Bills" in wb.sheetnames and "Combined" in wb.sheetnames
+
+
+def test_concert_seasons_truliant_amphitheater():
+    # Concert Seasons at Truliant Amphitheater -> "Live Nation Truliant Amphitheater".
+    # ("Live Nation Flex" becomes Concert Seasons in stage 0.)
+    v = _final_vendor([_row(Vendor="Live Nation Flex", PerformerName="Some Act",
+                            VenueName="Truliant Amphitheater",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Live Nation Truliant Amphitheater"]
