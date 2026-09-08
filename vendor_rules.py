@@ -392,6 +392,12 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     #  to "Madison Square Garden". That's been removed — Concert Extras now
     #  behaves the same everywhere and becomes "Live Nation Extras" in stage 2.)
 
+    # 1c. AXS.com at Crypto.com Arena -> "Crypto.com Arena" (overrides the
+    #     general AXS / AXS.com -> Veritix rename done in stage 2, so it must run
+    #     before it while the vendor is still "AXS.com").
+    crypto_mask = (df["Vendor"].astype(str) == "AXS.com") & (venue.str.lower() == "crypto.com arena")
+    df.loc[crypto_mask, "Vendor"] = "Crypto.com Arena"
+
     # 2. Substring replacements.
     df = _apply_vendor_replacements(df)
 
@@ -452,5 +458,6 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     df["Vendor"] = df["Vendor"].astype(str).str.title()
     df["Vendor"] = df["Vendor"].str.replace("Philadelphia 76Ers", "Philadelphia 76ers", regex=False)
     df["Vendor"] = df["Vendor"].str.replace("San Francisco 49Ers", "San Francisco 49ers", regex=False)
+    df["Vendor"] = df["Vendor"].str.replace("Crypto.Com Arena", "Crypto.com Arena", regex=False)
 
     return df
