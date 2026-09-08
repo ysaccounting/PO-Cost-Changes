@@ -1359,3 +1359,17 @@ def test_concert_seasons_truliant_amphitheater():
                             VenueName="Truliant Amphitheater",
                             InitialTicketCostTotal=0, TicketCostTotal=100)])
     assert v == ["Live Nation Truliant Amphitheater"]
+
+
+def test_axs_at_crypto_com_arena():
+    # AXS.com at Crypto.com Arena -> "Crypto.com Arena" (exact casing, overriding
+    # the general AXS.com -> Veritix rename).
+    v = _final_vendor([_row(Vendor="AXS.com", PerformerName="Some Act",
+                            VenueName="Crypto.com Arena",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Crypto.com Arena"]
+    # AXS.com elsewhere still becomes Veritix.
+    v = _final_vendor([_row(Vendor="AXS.com", PerformerName="Some Act",
+                            VenueName="Some Other Arena",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Veritix"]
