@@ -1373,3 +1373,15 @@ def test_axs_at_crypto_com_arena():
                             VenueName="Some Other Arena",
                             InitialTicketCostTotal=0, TicketCostTotal=100)])
     assert v == ["Veritix"]
+
+
+def test_concert_seasons_white_river_venues():
+    # Two distinct venues that were previously both coded "Live Nation White River".
+    v = _final_vendor([_row(Vendor="Live Nation Flex", PerformerName="Some Act",
+                            VenueName="Everwise Amphitheater at White River State Park",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Live Nation Everwise Amphitheater at White River State Park"]
+    v = _final_vendor([_row(Vendor="Live Nation Flex", PerformerName="Some Act",
+                            VenueName="White River Amphitheatre",
+                            InitialTicketCostTotal=0, TicketCostTotal=100)])
+    assert v == ["Live Nation White River"]
