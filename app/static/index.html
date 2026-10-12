@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Engine</title>
+<link rel="stylesheet" href="/static/app.css?v=e96f51f8">
+</head>
+<body>
+
+<!-- The sign-in backdrop. Everything is in CSS: the ground is a gradient and
+     the artwork is a tinted alpha mask on #loginbg::after -- see app.css.
+     An empty element rather than an <img> so the tint stays a CSS variable,
+     and so a browser without mask support gets nothing rather than a solid
+     blue rectangle. Shown and hidden with the card, by showLogin(). -->
+<div id="loginbg" aria-hidden="true">
+  <!-- THE PHOTOGRAPH: Union Pacific 844 in the canyon, chosen from four
+       options. It fills this panel from app.css (#loginbg), so the panel's
+       responsive rules -- right half on desktop, a band across the top on a
+       phone -- keep working unchanged. -->
+</div>
+
+<div id="login">
+  <span class="lmark"><i class="the">the</i>Engine</span>
+  <h1>Sign in</h1>
+  <p id="lsub" style="display:none"></p>
+  <div id="step1">
+    <input id="u" placeholder="username" autocomplete="username">
+    <input id="p" type="password" placeholder="password" autocomplete="current-password">
+    <button id="go">Sign In</button>
+    <div style="text-align:center;margin-top:10px">
+      <a href="#" id="forgot" style="font-size:12px;color:var(--accent)">Forgot password?</a>
+    </div>
+  </div>
+  <div id="step2" style="display:none">
+    <p style="font-size:13px;color:var(--tx2)">We emailed you a 6-digit code.</p>
+    <input id="code" inputmode="numeric" maxlength="6" placeholder="000000"
+           style="letter-spacing:.4em;text-align:center;font-size:19px">
+    <label style="display:block;font-size:12px;color:var(--tx2);margin:4px 0 9px">
+      <input type="checkbox" id="trust" checked style="width:auto"> Don't ask again on this
+      browser for 12 hours</label>
+    <button id="verify">Verify</button>
+    <div style="text-align:center;margin-top:10px">
+      <a href="#" id="backToLogin" style="font-size:12px;color:var(--accent)">Back</a></div>
+  </div>
+  <div id="step3" style="display:none">
+    <p style="font-size:13px;color:var(--tx2)">Choose a new password (12+ characters).</p>
+    <input id="np" type="password" placeholder="new password" autocomplete="new-password">
+    <input id="np2" type="password" placeholder="confirm password" autocomplete="new-password">
+    <button id="doreset">Set Password</button>
+  </div>
+  <div class="err" id="lerr"></div>
+</div>
+
+<div id="app">
+  <header>
+  <h1 class="sr-only">The Engine</h1>
+
+    <!-- TWO NAVIGATIONS, one header.
+         Everything to the left of the spacer belongs to a company: the feed,
+         its rules, its audit log. Companies, User Management and Algorithms
+         do not -- they are about the whole installation, and living inside
+         "Y&S Tickets" made them look like that company's settings.
+         `body.scope-global` swaps which set is shown. -->
+    <div class="cowrap" id="cowrap">
+      <select id="company" title="Company"></select>
+    </div>
+
+    <!-- Upload lives with the feed tabs; Refresh and Undo are icons in the grid
+         bar. The header is for moving between screens, nothing else. -->
+    <!-- HOME sits first, before Bank Feed. Deliberately empty for now: it is
+         the landing screen and what belongs on it will be decided as it is
+         used. An empty screen with a name is honest about that; a stand-in
+         dashboard of made-up tiles would have to be un-built later. -->
+    <button class="ghost" id="homeBtn">Home</button>
+    <button class="ghost" id="feedBtn">Bank Feed</button>
+    <button class="ghost" id="cardsBtn">QBO Sync
+      <span id="cardWarn" style="display:none;color:var(--bad)">●</span></button>
+    <!-- BROKER DATA: where the broker's people and season ticket records come
+         from, how they read, and the company's own teams and payment plans. -->
+    <button class="ghost" id="brokerBtn">Broker Data</button>
+
+    <button class="ghost" id="auditBtn">Audit Log</button>
+
+    <button class="ghost" id="setupBtn">Configuration</button>
+    <!-- The installation-wide screens. Shown instead of the company ones when
+         no company is open. -->
+    <button class="ghost gnav" id="gHomeBtn">Home</button>
+    <button class="ghost gnav" id="companiesBtn">Companies</button>
+    <button class="ghost gnav" id="usersBtn">User Management</button>
+    <button class="ghost gnav" id="teamsBtn">Teams &amp; Payment Plans</button>
+    <button class="ghost gnav" id="algoBtn">Algorithms</button>
+    <button class="ghost gnav" id="tablesBtn">Tags</button>
+    <!-- The audit log is not a company's: it records every company, and
+         reading it is a dashboard-level job. -->
+    <button class="ghost gnav" id="gAuditBtn">Audit Log</button>
+    <button class="ghost gnav" id="guideBtn">User Guide</button>
+    <!-- The gap sits AFTER the screen buttons, so they stay beside the company
+         they apply to instead of being flung to the far edge. -->
+    <span class="spacer"></span>
+    <div class="brand"><span><i class="the">the</i>Engine</span></div>
+    <button class="ghost" id="undoBtn" style="display:none"></button>
+    <span class="signout">
+      <button class="avatar" id="avatar" title="Account"></button>
+      <div class="avatarmenu" id="avatarMenu">
+        <div class="who" id="who"></div>
+        <button id="profileBtn">Profile</button>
+        <button id="out">Sign Out</button>
+      </div>
+    </span>
+  </header>
+
+  <div id="halWarn" class="banner" style="display:none">
+    STH is not synced yet — expense categories are unverified. Run the STH sync
+    to validate season-ticket holders.
+  </div>
+
+  <nav>
+    <button class="on" data-s="for_review">For Review <span id="c_review"></span></button>
+    <button data-s="categorized">Categorized <span id="c_cat"></span></button>
+    <button data-s="excluded">Excluded <span id="c_exc"></span></button>
+    <!-- Labeled up front. It used to be empty until the counts request came
+         back, so a refresh showed a stub of a button that then jumped to full
+         width. -->
+    <button id="billsavail" data-s="bills"
+            title="Open bills available to match against">Open Bills</button>
+    <!-- ALL BILLS: every bill in QuickBooks, open or paid -- the Open Bills
+         grid, starting on Current bills. -->
+    <button id="allbillsBtn" data-s="allbills"
+            title="Every bill in QuickBooks, open or paid">All Bills</button>
+    <!-- NOT a data-s tab: those filter the charge list by status, and this
+         opens a different screen. The rules that code a charge belong beside
+         the charges they code, and they are PER COMPANY -- which is why this
+         one stayed here while the rest of Rules & Tags moved to the dashboard,
+         where nothing has a company. -->
+    <button id="codingBtn" title="The rules that set vendor and category"
+      >Bank Feed Rules</button>
+    <!-- SUGGESTIONS FROM PAST CODING, beside the rules that also fill vendor
+         and category. Per company. -->
+    <button id="sgFeedBtn" title="Vendor and category suggested from past coding">Suggestions</button>
+    <!-- Beside the rules, for the same reason: it sets a column of the charges
+         on this screen (the Profile), so it belongs with them rather than in
+         Configuration. Opens like Bank Feed Rules, the feed's tabs staying. -->
+    <button id="ccProfilesBtn" title="Rules that set the Profile for general cards"
+      >Credit Card Profiles</button>
+  </nav>
+
+  <div id="screen-coding" class="screen">
+    <div id="codingGrid"></div>
+  </div>
+  <div id="screen-ccprofiles" class="screen">
+    <div id="ccProfilesGrid"></div>
+  </div>
+  <div id="screen-suggestions" class="screen">
+    <div id="sgFeedGrid"></div>
+  </div>
+
+  <div class="filters">
+    <!-- COMPANIES: only in Multi-Company, before Card Accounts. -->
+    <div class="ms" id="fcompWrap" style="position:relative;display:none">
+      <button class="ghost" id="fcompBtn" style="min-width:150px;text-align:left">All Companies</button>
+      <div id="fcompMenu" class="msmenu" style="display:none;position:absolute;z-index:20;top:34px;left:0;
+           min-width:260px"></div>
+    </div>
+    <div class="ms" style="position:relative">
+      <button class="ghost" id="fcardBtn" style="min-width:170px;text-align:left">All Cards</button>
+      <div id="fcardMenu" style="display:none;position:absolute;z-index:20;top:34px;left:0;
+           background:var(--card);border:1px solid var(--line);border-radius:8px;
+           padding:8px;min-width:340px;max-width:min(560px,92vw);
+           box-shadow:0 6px 18px rgba(0,0,0,.08)"></div>
+    </div>
+
+    <!-- One choice on For Review and Excluded, so a plain select matches the
+         controls beside it. Categorized allows several kinds at once, so it
+         keeps the checkbox menu; the two swap by tab. -->
+    <!-- Three multi-selects built the same way as Card Accounts: a button that
+         names the selection, and a menu of checkboxes. Everything ticked means
+         "no filter" and is sent as nothing. -->
+    <div class="ms" style="position:relative">
+      <button class="ghost msbtn" id="ftypeBtn" data-menu="ftypeMenu"
+              style="min-width:200px;text-align:left">Transaction Types</button>
+      <div class="msmenu" id="ftypeMenu"></div>
+    </div>
+
+    <!-- Categorized asks a different question -- what a charge was resolved AS
+         -- so it has its own list, in the same slot. -->
+    <div class="ms" style="position:relative">
+      <button class="ghost msbtn" id="fkindBtn" data-menu="fkindMenu"
+              style="min-width:200px;text-align:left">Transaction Types</button>
+      <div class="msmenu" id="fkindMenu"></div>
+    </div>
+
+
+    <button class="ghost" id="moreFilters">Filters</button>
+    <!-- Kept, but hidden: Reset lives in the Filters dialog now. The handler
+         behind this button is what that one calls, so removing the element
+         would mean duplicating the logic to save a line of markup. -->
+    <button class="ghost" id="resetFilters" style="display:none !important"
+            title="Clear every filter">Reset Filters</button>
+    <label style="font-size:12px;color:var(--tx2)">Page size</label>
+    <select id="fpage" title="rows per page" style="width:78px">
+      <option value="25">25</option><option value="50">50</option>
+      <option value="100">100</option><option value="200" selected>200</option>
+      <option value="300">300</option>
+      <option value="500">500</option>
+    </select>
+    <button class="ghost" id="prevPage" style="padding:6px 10px">‹ Prev</button>
+    <button class="ghost" id="nextPage" style="padding:6px 10px">Next ›</button>
+    <span class="why" id="pageinfo"></span>
+    <!-- Beside the results text, not under it: on its own line it needed
+         centering against a grid wider than the window, which never looked
+         right from any anchor. -->
+    <span id="pagenums" style="display:none;gap:4px;align-items:center"></span>
+
+    <span class="who" id="shown"></span>
+
+    <!-- Bulk actions sit on the pagination row rather than a row of their own.
+         Appearing on selection used to push the whole grid down a line, which
+         moved the row you had just clicked. -->
+    <!-- The bills bar sits on this row too, for the same reason: on a row of
+         its own it pushed the grid down a line the moment you ticked a box. -->
+    <span id="billbulk" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
+      <!-- Also shown here. The pagination row is the preferred home and
+           setSelectionCount still writes there, but three attempts at that
+           element alone each failed on one grid or the other -- and this bar
+           is the one thing on screen that provably appears the moment a row is
+           ticked, because its own display is driven by the selection. -->
+      <b id="billbulkn" style="font-size:13px;margin-right:4px"></b>
+      <!-- Split and Delete are in the Action column on every row, so offering
+           them here as well put the same two actions in two places a few
+           centimeters apart -- one of which appears only once something is
+           ticked. Hidden, not removed: their handlers are what the Action
+           column's buttons call, and deleting them would mean duplicating that
+           logic to save two lines of markup. -->
+      <button id="billSplitOne" style="display:none !important">Split Bill</button>
+      <button id="billDeleteOne" style="display:none !important">Delete Bill</button>
+      <button id="billBatch" style="display:none !important">Batch Actions</button>
+      <!-- Reached through the dialog now, but kept so their handlers stay in
+           one place rather than being duplicated into it. -->
+      <button class="ghost" id="billSetVendor" style="display:none">Update Vendors</button>
+      <button class="ghost" id="billSetAmount" style="display:none">Update Amounts</button>
+
+    </span>
+
+    <span id="bulkinline" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
+      <!-- Hidden, but kept: Batch Actions' "Add All" runs through this handler,
+           and duplicating that logic to delete one button would be worse. -->
+      <button id="bAdd" style="display:none"></button>
+      <b id="bulkinlinen" style="font-size:13px;margin-right:4px"></b>
+      <button id="bBatch" style="display:none !important;background:#15803d;color:#fff;
+              border:1px solid #15803d;border-radius:6px;padding:5px 14px;
+              font-weight:600">Batch Actions</button>
+      <button class="ghost" id="bSetVendor">Update Vendor</button>
+      <button class="ghost" id="bSetCategory">Update Category</button>
+      <button id="bSplit" style="background:#15803d;color:#fff;
+              border:1px solid #15803d;border-radius:6px;padding:5px 14px;
+              font-weight:600">Split Transaction</button>
+      <button class="ghost" id="bExclude">Exclude</button>
+      <button class="ghost" id="bUndo">Undo</button>
+
+
+      <!-- Last on the row: the one irreversible action shouldn't sit where a
+           hand traveling to Unexclude passes over it. -->
+      <button id="purgeBtn"
+              style="display:none;background:var(--bad);color:#fff;
+                     border:1px solid var(--bad);border-radius:6px;
+                     padding:5px 14px;font-weight:600">
+        Delete Permanently</button>
+    </span>
+  </div>
+  <dialog id="billfilters">
+  <!-- The same dialog the transaction grids use: one concept, not two. The
+       inline strip re-flowed at every window width and sat above the grid,
+       pushing it down whenever it was open. -->
+  <div style="display:flex;flex-direction:column;max-height:82vh">
+    <h3>Filters</h3>
+    <div id="billFilterRows">
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Date From</label><input id="bdfrom" type="date"></div><div style="flex:1;min-width:0;position:relative"><label>Date To</label><input id="bdto" type="date"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Amount Min</label><input id="bamin" type="number" step="0.01" style="width:120px" placeholder="0.00"></div><div style="flex:1;min-width:0;position:relative"><label>Amount Max</label><input id="bamax" type="number" step="0.01" style="width:120px" placeholder="0.00"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Balance Min</label><input id="bbmin" type="number" step="0.01" style="width:120px" placeholder="0.00"></div><div style="flex:1;min-width:0;position:relative"><label>Balance Max</label><input id="bbmax" type="number" step="0.01" style="width:120px" placeholder="0.00"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Vendor</label><input id="bven" placeholder="Vendor" style="width:200px"></div><div style="flex:1;min-width:0;position:relative"><label>Memo</label><input id="bmemo" placeholder="Memo text" style="width:240px"></div></div>
+        <!-- CLASS on the left of Aging: the Classes on this company's bills. -->
+        <div class="frow"><div class="ms" style="flex:1;min-width:0;position:relative"><label>Class</label><button class="ghost msbtn" id="bclassBtn" data-menu="bclassMenu"
+                  style="min-width:150px;text-align:left">Class</button><div class="msmenu" id="bclassMenu"></div></div><div class="ms" style="flex:1;min-width:0;position:relative"><label>Aging</label><button class="ghost msbtn" id="bageBtn" data-menu="bageMenu"
+                  style="min-width:150px;text-align:left">Aging</button><div class="msmenu" id="bageMenu"></div></div></div>
+    </div>
+    <div class="dact" style="border-top:1px solid var(--line);padding-top:12px;
+         justify-content:center">
+      <button id="closeBillFilters"
+              style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Close</button>
+      <button id="resetBillFiltersModal"
+              style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Reset</button>
+      <button id="applyBillFilters"
+              style="background:#15803d;color:#fff;border:1px solid #15803d;
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Apply</button>
+    </div>
+  </div>
+</dialog>
+  <dialog id="advfilters">
+  <!-- A DIALOG, one field per line.
+       Seventeen fields in two wrapping rows re-flowed at every window width, so
+       a field moved between visits. This is the same set of controls in an
+       order that does not move.
+
+       Laid out as a flex COLUMN with the field list scrolling and the action
+       row outside it, so Apply and Reset stay visible however long the list
+       is -- buttons that scroll away are buttons people cannot find. -->
+  <div style="display:flex;flex-direction:column;max-height:82vh;min-height:0">
+    <h3 style="margin:0 0 4px">Filters</h3>
+    <!-- THE ROWS SCROLL, THE BUTTONS DO NOT. A picker opens inside this area
+         and can be 250px tall; with the whole dialog as one scrolling box
+         that pushed Apply and Cancel below the fold, and a button you have
+         to go looking for is a button people miss. -->
+    <div id="advFilterRows" style="flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:visible">
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Date From</label><input id="fdfrom" type="date"></div><div style="flex:1;min-width:0;position:relative"><label>Date To</label><input id="fdto" type="date"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Amount Min</label><input id="famin" type="number" step="0.01" style="width:100px" placeholder="0.00"></div><div style="flex:1;min-width:0;position:relative"><label>Amount Max</label><input id="famax" type="number" step="0.01" style="width:100px" placeholder="0.00"></div></div>
+        <div class="frow"><div id="fcvenWrap" style="flex:1;min-width:0;position:relative"><label>Vendor</label><button class="cellsel filterpick" data-target="fcven" data-kind="vendor"
+                  style="width:160px"><span class="cs-v"
+            ><i style="color:var(--tx2)">Any vendor</i></span
+            ><span class="cs-c">▾</span></button>
+          <input type="hidden" id="fcven"></div><div id="fcatWrap" style="flex:1;min-width:0;position:relative"><label>Category</label><button class="cellsel filterpick" data-target="fcat" data-kind="category"
+                  style="width:170px"><span class="cs-v"
+            ><i style="color:var(--tx2)">Any category</i></span
+            ><span class="cs-c">▾</span></button>
+          <input type="hidden" id="fcat"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>Bank Detail</label><input id="fven" placeholder="Bank detail" style="width:170px"></div><div style="flex:1;min-width:0;position:relative"><label>Profile</label><input id="fprof" placeholder="Name on card" style="width:150px"></div></div>
+        <div class="frow"><div style="flex:1;min-width:0;position:relative"><label>CC Last 4/5</label><input id="fl4" placeholder="1234" maxlength="5" style="width:80px"></div><div style="flex:1;min-width:0;position:relative"><label>QBO Memo</label><input id="fmemo" placeholder="QBO memo text" style="width:190px"></div></div>
+        <div class="frow"><div class="ms" style="flex:1;min-width:0;position:relative"><label>Strengths / Records</label><button class="ghost msbtn" id="ftierBtn" data-menu="ftierMenu"
+                  style="width:170px;text-align:left">All Strengths</button><div class="msmenu" id="ftierMenu"></div></div><div class="ms" style="flex:1;min-width:0;position:relative"><label>Ingestion Method</label><button class="ghost msbtn" id="fingestBtn" data-menu="fingestMenu"
+                  style="width:170px;text-align:left">All Ingestion Methods</button><div class="msmenu" id="fingestMenu"></div></div></div>
+        <div class="frow">
+          <div style="flex:1;min-width:0;position:relative">
+            <!-- Coded by the engine, or by a person? The RULE badge answers it
+                 per row; this asks it of the whole grid. -->
+            <label>Rules Applied</label>
+            <select id="frules">
+              <option value="">Both</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div id="fuserWrap" class="ms" style="flex:1;min-width:0;position:relative"><label>User</label><button class="ghost msbtn" id="fuserBtn" data-menu="fuserMenu"
+                    style="width:170px;text-align:left">All Users</button><div class="msmenu" id="fuserMenu"></div></div>
+        </div>
+        <div class="frow"><div class="ms" style="flex:1;min-width:0;position:relative"><label>Action Types</label><button class="ghost msbtn" id="fmatchBtn" data-menu="fmatchMenu"
+                  style="width:170px;text-align:left">All Action Types</button><div class="msmenu" id="fmatchMenu"></div></div><div style="flex:1;min-width:0;position:relative"><label>Source Currency</label><select id="fcur" style="width:130px">
+            <option value="">All</option>
+            <option value="USD">USD</option>
+            <option value="CAD">CAD</option>
+            <!-- Everything else in one bucket: the exports carry INR and EUR
+                 too, and listing every code somebody might ever charge in is a
+                 list that goes stale. -->
+            <option value="OTHER">Other</option>
+          </select></div><div style="flex:1;min-width:0;position:relative"><label>Source Amount Min</label><input id="fsamin" placeholder="0.00" inputmode="decimal"></div><div style="flex:1;min-width:0;position:relative"><label>Source Amount Max</label><input id="fsamax" placeholder="0.00" inputmode="decimal"></div></div>
+        
+        <div class="frow"><div id="ftsFromWrap" style="flex:1;min-width:0;position:relative"><label>Time Stamp From</label><input id="ftsfrom" type="date"></div><div id="ftsToWrap" style="flex:1;min-width:0;position:relative"><label>Time Stamp To</label><input id="ftsto" type="date"></div></div>
+        
+    </div>
+    <div class="dact" style="border-top:1px solid var(--line);padding-top:12px;
+         margin-top:0;justify-content:center">
+      <!-- Centerd, and colored by what each one does: Cancel is the neutral
+           way out, Reset destroys the filters you set, Apply is the action you
+           came for. -->
+      <button id="closeFilters"
+              style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Close</button>
+      <button id="resetFiltersModal"
+              style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Reset</button>
+      <button id="applyFilters"
+              style="background:#15803d;color:#fff;border:1px solid #15803d;
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Apply</button>
+    </div>
+  
+</div></dialog>
+  <!-- The audit log's filters, built to the same shape as the charge grid's:
+       one field per line, labeled, with the action row outside the scrolling
+       list so Apply and Reset never scroll away. -->
+  <!-- Sized to the CONTENT: two fields plus the gap, which is what the
+     widest pairing asks for. 880px was a number picked to be "wider"
+     rather than measured, and it left the rows floating in space. -->
+  <!-- A FIXED width. `max-content` sized the dialog to its widest label, so
+     ticking a box changed a button from "All Actions" to "3 Actions" and
+     the whole window resized under the pointer. A filter panel that moves
+     while you use it is one you have to re-aim at after every click. -->
+  <dialog id="auditfilters" style="width:min(660px,94vw);max-width:94vw">
+  <div style="display:flex;flex-direction:column;max-height:82vh">
+    <h3 style="margin:0 0 4px">Filters</h3>
+    <div id="auditFilterRows">
+      <div class="frow">
+        <div style="flex:1;min-width:0;position:relative">
+          <label>Date From</label><input id="auditFrom" type="date"></div>
+        <div style="flex:1;min-width:0;position:relative">
+          <label>Date To</label><input id="auditTo" type="date"></div>
+      </div>
+      <div class="frow">
+        <!-- Group first, then the action, matching the column order on the
+             grid: you narrow to a family before naming one of its members. -->
+        <div id="aGroupWrap" style="flex:1;min-width:0;position:relative"><label>Action Groups</label><button class="cellsel filterpick" data-target="aGroupHidden" data-kind="auditgroup"><span class="cs-v"><i style="color:var(--tx2)">All action groups</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aGroupHidden"></div>
+        <div id="aActionWrap" style="flex:1;min-width:0;position:relative"><label>Actions</label><button class="cellsel filterpick" data-target="aActionHidden" data-kind="auditaction"><span class="cs-v"><i style="color:var(--tx2)">All actions</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aActionHidden"></div>
+      </div>
+      <div class="frow">
+        <div id="aActorWrap" style="flex:1;min-width:0;position:relative"><label>Users</label><button class="cellsel filterpick" data-target="aActorHidden" data-kind="auditactor"><span class="cs-v"><i style="color:var(--tx2)">All users</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aActorHidden"></div>
+        <div id="aCardWrap" style="flex:1;min-width:0;position:relative"><label>Card Accounts</label><button class="cellsel filterpick" data-target="aCardHidden" data-kind="auditcard"><span class="cs-v"><i style="color:var(--tx2)">All card accounts</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aCardHidden"></div>
+      </div>
+      <div class="frow">
+        <div id="aVendorWrap" style="flex:1;min-width:0;position:relative"><label>Vendor</label><button class="cellsel filterpick" data-target="aVendorHidden" data-kind="vendor"><span class="cs-v"><i style="color:var(--tx2)">Any vendor</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aVendorHidden"></div>
+        <div id="aCatWrap" style="flex:1;min-width:0;position:relative"><label>Category</label><button class="cellsel filterpick" data-target="aCatHidden" data-kind="category"><span class="cs-v"><i style="color:var(--tx2)">Any category</i></span><span class="cs-c">&#9662;</span></button><input type="hidden" id="aCatHidden"></div>
+      </div>
+      <div class="frow">
+        <div style="flex:1;min-width:0;position:relative">
+          <label>Profile</label>
+          <input id="auditProfile" placeholder="Name on card" style="width:170px"></div>
+        <div style="flex:1;min-width:0;position:relative">
+          <label>CC Last 4/5</label>
+          <input id="auditLast4" placeholder="1234" maxlength="4" style="width:80px"></div>
+      </div>
+      <div class="frow">
+        <div style="flex:1;min-width:0;position:relative">
+          <label>Platform TXN ID</label>
+          <input id="auditTxn" placeholder="Any" style="width:170px"></div>
+        <div style="flex:1;min-width:0;position:relative">
+          <label>QBO Txn ID</label>
+          <input id="auditQbo" placeholder="Any" style="width:170px"></div>
+      </div>
+    </div>
+    <div class="dact" style="border-top:1px solid var(--line);padding-top:12px;
+         margin-top:0;justify-content:center">
+      <button id="auditClose"
+              style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Close</button>
+      <button id="auditReset"
+              style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Reset</button>
+      <button id="auditApply"
+              style="background:#15803d;color:#fff;border:1px solid #15803d;
+                     border-radius:7px;padding:6px 18px;font-weight:600"
+        >Apply</button>
+    </div>
+  </div></dialog>
+
+  <div id="activefilters" style="padding:0 20px 8px;display:none"></div>
+
+
+  <datalist id="vendorlist"></datalist>
+  <datalist id="catlist"></datalist>
+  <!-- Above the scroller, not inside a header: in the header they occupied a
+       flex slot and pushed every column label out of line with its rows. -->
+
+  <!-- Page numbers and the selection count, centerd under the pager controls.
+       Its own line, because inside the wrapping filter row they never centerd
+       predictably and left dead space when empty. Hidden outright when there
+       is nothing to say, so it takes no height at all. -->
+  <div id="pagerbar" style="display:none;align-items:center;gap:10px;
+       padding:0 20px 6px"></div>
+
+  <!-- OPEN BILLS: how many are mirrored and when, as on Vendors. -->
+  <div id="billsStatus" style="display:none;padding:0 20px 6px;font-size:12px;color:var(--tx2);
+       align-items:center;gap:10px"></div>
+  <div id="gridicons" style="display:none;padding:0 20px 6px;gap:6px;
+       align-items:center"></div>
+
+  <div id="gridscroll" style="overflow-x:auto;padding:0 20px">
+  <div id="colhead" style="margin:0;
+       padding:7px 14px;font-size:13px;font-weight:600;text-transform:uppercase;
+       letter-spacing:.04em;color:var(--tx)">
+    <input type="checkbox" id="pickAll" title="Select every row on this page"
+           style="width:auto;flex:none;margin:0 0 0 1px">
+  </div>
+  <!-- "Updating Grid": the blue ring, with its label above it, shown while a
+       filtered grid is being re-fetched. One element for every grid; see
+       gridBusyStart in app.js. Clicks pass through, so it never traps you. -->
+  <!-- The SAME classes as the screen-change spinner (see withWait), so the two
+       cannot drift apart: same ring, same plain bold label above it. -->
+  <div id="gridBusy" class="bigspin navwait" style="display:none">
+    <div class="cosub">Updating Grid</div>
+  </div>
+  <main id="list" style="padding:0;max-width:none"><div class="empty">Loading…</div></main>
+  </div>
+
+  <!-- Full screens. Each replaces the feed rather than floating over it: these
+       are places you go and work, not questions you answer and dismiss. -->
+  <div id="screen-audit" class="screen">
+    <!-- No .screenhead. This screen has no tabs and no header controls -- the
+         Filters button lives in the grid toolbar beside the quick search -- so
+         an empty header element was a blank band above the grid and nothing
+         else. -->
+    <!-- The toolbar and the pager live OUTSIDE the region that re-renders.
+         They used to be inside it, so every keystroke in the quick search
+         destroyed and rebuilt the input the keystroke came from -- which is
+         why the screen appeared to reload as you typed. -->
+    <div id="auditGrid">
+      <div id="auditTools"></div>
+      <div id="auditRows"></div>
+    </div>
+  </div>
+
+  <!-- THE USER GUIDE: built with its PDF from tools/guide_content.py. -->
+  <div id="screen-guide" class="screen">
+    <div class="screenhead" style="justify-content:flex-start;gap:14px">
+      <h2>User Guide</h2>
+      <a id="guidePdf" href="/static/user-guide.pdf" download="Engine-User-Guide.pdf"
+         style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;
+                padding:5px 14px;font-weight:600;font-size:13px;text-decoration:none">Download PDF</a>
+    </div>
+    <div id="guideBody" class="ug"></div>
+  </div>
+  <div id="screen-tables" class="screen">
+    <div class="screenhead">
+      <nav class="screentabs">
+        <button class="on" data-t="canada">Canada</button>
+        <button data-t="payment">CC Payments / Wires</button>
+<button data-t="ccvendors">CC Vendors</button>
+        <button data-t="virtual">Virtual Cards</button>
+      </nav>
+    </div>
+    <div id="tablesGrid"></div>
+  </div>
+
+  <div id="screen-setup" class="screen">
+    <div class="screenhead">
+      <nav class="screentabs">
+        
+        <button data-su="connectors">Connectors</button>
+        <button data-su="users">Users</button>
+        <button data-su="settings">Settings</button>
+      </nav>
+    </div>
+    <div id="setupGrid"></div>
+  </div>
+
+  <div id="screen-broker" class="screen">
+    <div class="screenhead">
+      <nav class="screentabs">
+        <button data-bk="databases">Databases</button>
+        <button data-bk="book">Profiles / Address Book</button>
+        <button data-bk="sth">Season Ticket Records</button>
+        <button data-bk="words">Renewal Status Words</button>
+        <button data-bk="years">Renewal Years</button>
+        <button data-bk="teams">Teams</button>
+        <button data-bk="plans">Payment Plans</button>
+      </nav>
+    </div>
+    <div id="brokerGrid"></div>
+  </div>
+
+  <!-- TEAMS & LEAGUES. The five tabs here were on Algorithms, which is about
+       how the matcher scores things; these are the DATA it scores against.
+       Teams, their payment plans, the renewal years, the season-ticket
+       records and the marketplaces are one subject, and it is not the
+       algorithm. -->
+  <div id="screen-teams" class="screen">
+    <!-- screenhead / screentabs, the classes every other screen tab row
+           uses. I invented "subnav"/"subtabs" for this one and nothing
+           styles those, so the buttons were in the DOM and invisible. -->
+      <div class="screenhead">
+      <nav class="screentabs" id="teamsTabs">
+        <!-- ONE GRID for teams and their payment plans: a team's venue and bank
+             details sit beside its plan, so there is one place to look. -->
+        <button class="on" data-tl="teams">Teams</button>
+        <button data-tl="plans">Payment Plans</button>
+        <!-- RENEWAL STATUS WORDS: the Engine Notation and colors, every company's. -->
+        <button data-tl="statuses">Renewal Status Words</button>
+        <!-- "Seasons" was ambiguous next to a payment plan's months. A renewal
+             year is what this actually holds. -->
+        <button data-tl="marketplaces">Marketplaces</button>
+          <button data-tl="abbrev">Abbreviations</button>
+      </nav>
+    </div>
+    <div id="teamsGrid"></div>
+  </div>
+
+  <div id="screen-algo" class="screen">
+    <div class="screenhead">
+      <nav class="screentabs">
+        <button class="on" data-a="signals">Signals</button>
+        <button data-a="gates">Gates</button>
+        <button data-a="strengths">Strengths</button>
+        <button data-a="tie">Monthly Payments</button>
+        <button data-a="ignored">Ignored Words</button>
+        <button data-a="exceptions">Exceptions</button>
+        <button data-a="suggestions">Suggestions</button>
+      </nav>
+    </div>
+    <div id="algoGrid"></div>
+  </div>
+
+  <div id="screen-home" class="screen">
+    <div id="homeGrid"></div>
+  </div>
+
+  <div id="screen-companies" class="screen">
+    <div id="companiesGrid"></div>
+  </div>
+
+  <div id="screen-users" class="screen">
+    <!-- USERS, SETTINGS (minutes before an idle sign-out) and ROLES (what each
+         role can do). -->
+    <div class="screenhead">
+      <nav class="screentabs" id="usersTabs">
+        <button class="on" data-u="users">Users</button>
+        <button data-u="settings">Settings</button>
+        <button data-u="roles">Roles</button>
+      </nav>
+    </div>
+    <div id="usersGrid"></div>
+  </div>
+
+  <div id="screen-scan" class="screen">
+    <div id="scanGrid"></div>
+  </div>
+
+  <div id="screen-cards" class="screen">
+    <div id="cardsGrid"></div>
+  </div>
+
+</div>
+
+<dialog id="cols" style="max-width:420px">
+  <h3 id="colsTitle">Column Settings</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:10px" id="colsWhich">
+    Drag to reorder, and select or deselect to display or hide.</div>
+  <div id="colsBody" style="max-height:56vh;overflow:auto"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="colsReset"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 16px">Reset To Default</button>
+    <button id="colsClose"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Done</button>
+  </div>
+</dialog>
+
+<dialog id="rules" style="max-width:760px">
+  <h3>Learned coding rules</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:10px">
+    Built from what your team actually codes. A rule starts applying itself once
+    it's been confirmed enough times — auto-coded charges still land in
+    Categorized for a person to see before anything reaches QuickBooks.
+  </div>
+  <div id="rulesBody" style="max-height:58vh;overflow:auto"></div>
+  <div class="dact">
+    <button class="ghost" id="applyrules">Apply Auto Rules Now</button>
+    <button class="ghost" id="rcancel">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="cards" style="max-width:720px">
+  <h3>Card Accounts</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:12px">
+    Each card program settles to one QuickBooks account. Map the program once —
+    every virtual card in it, now and in future, resolves automatically.
+  </div>
+  <div id="cardsBody" style="max-height:60vh;overflow:auto"></div>
+  <div class="dact"><button class="ghost" id="ccancel">Cancel</button></div>
+</dialog>
+
+<dialog id="setup">
+  <h3>Setup</h3>
+  <div id="setupBody" style="font-size:13px"></div>
+  <div class="dact"><button class="ghost" id="scancel">Cancel</button></div>
+</dialog>
+
+<dialog id="confirm" style="max-width:460px">
+  <h3 id="confirmTitle">Check before continuing</h3>
+  <!-- Centerd, with a measure narrow enough that two lines break evenly
+       instead of leaving one word stranded on the second. -->
+  <div id="confirmBody" style="font-size:13px;line-height:1.6;text-align:center;
+       max-width:33em;margin:0 auto;text-wrap:balance"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="confirmBack"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Go Back</button>
+    <button id="confirmGo"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Proceed</button>
+  </div>
+</dialog>
+
+<div id="flash"></div>
+
+<div id="cellpick" style="display:none">
+  <input id="cellpickSearch" placeholder="Type to narrow…" autocomplete="off">
+  <div id="cellpickList"></div>
+</div>
+
+<dialog id="billamt" style="max-width:600px;width:600px">
+  <h3>Change Amount</h3>
+  <!-- THE BILL, as Force Match shows its charge: bold headers, plain values. -->
+  <div id="billamtWho" style="font-size:13px;margin-bottom:10px;line-height:1.6"></div>
+  <label>How</label>
+  <select id="billamtMode" style="width:300px">
+    <option value="set">New amount</option>
+    <option value="delta">Increase or decrease by fixed $ amount</option>
+    <option value="percent">Increase or decrease by % of total</option>
+    <option value="cad">Adjust for CAD to USD</option>
+    <option value="vendors_open">Adjust for Vendors Open</option>
+  </select>
+  <label id="billamtValueLbl">Value</label>
+  <div id="billamtValueRow" style="display:flex;align-items:center;gap:6px">
+    <span id="billamtUnit" style="font-size:15px;color:var(--tx2);width:14px">$</span>
+    <input id="billamtValue" type="number" step="0.01" placeholder="0.00" style="width:150px;flex:none">
+  </div>
+  <div id="billamtHint" style="font-size:11px;color:var(--tx2);margin-top:6px"></div>
+  <!-- HOW AN INCREASE IS RECORDED: the bill's own amount, or the difference
+       as an Other Fees line (as Force Match offers). A decrease is always the
+       amount: Other Fees can only add. -->
+  <div id="billamtHowBox">
+  <label style="margin-top:10px">Record an increase as</label>
+  <label style="display:flex;gap:6px;align-items:center;font-weight:400;margin:4px 0 0">
+    <input type="radio" name="billamtHow" value="amount" style="width:auto"> A change to the bill's amount</label>
+  <label style="display:flex;gap:6px;align-items:center;font-weight:400;margin:2px 0 0">
+    <input type="radio" name="billamtHow" value="fees" style="width:auto"> An Other Fees line for the difference</label>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button class="ghost" id="billamtCancel">Cancel</button>
+    <button id="billamtGo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Apply</button>
+  </div>
+</dialog>
+
+<dialog id="bankOrCard" style="max-width:420px;position:relative">
+  <button id="bocCancel" title="Close" aria-label="Close"
+          style="position:absolute;top:8px;right:10px;background:none;border:none;
+                 color:var(--bad);font-size:20px;line-height:1;cursor:pointer">×</button>
+  <h3>New QuickBooks account</h3>
+  <div style="font-size:13px;margin-bottom:12px">
+    Create <b id="bankOrCardName"></b> in QuickBooks.<br><br>
+    A credit card program settles to a <b>Credit Card</b> account; a debit or
+    prepaid program settles to a <b>Bank</b> account.
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button id="bocBank"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Bank</button>
+    <button id="bocCard"
+            style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                   border-radius:6px;padding:6px 16px;font-weight:600">Credit Card</button>
+  </div>
+</dialog>
+
+<dialog id="acctType" style="max-width:400px">
+  <h3>Create category</h3>
+  <div style="font-size:13px;margin-bottom:10px">
+    <b id="acctTypeName"></b> will be added to the QuickBooks chart of accounts.
+  </div>
+  <label>Account type</label>
+  <!-- Every type QuickBooks accepts on an Account, grouped the way the chart of
+       accounts is. A sub-account must take its parent's type, so the list has
+       to cover whatever the parent happens to be. -->
+  <select id="acctTypeSel">
+    <optgroup label="Expenses">
+      <option value="Expense">Expense</option>
+      <option value="Cost of Goods Sold">Cost of Goods Sold</option>
+      <option value="Other Expense">Other Expense</option>
+    </optgroup>
+    <optgroup label="Income">
+      <option value="Income">Income</option>
+      <option value="Other Income">Other Income</option>
+    </optgroup>
+    <optgroup label="Assets">
+      <option value="Bank">Bank</option>
+      <option value="Accounts Receivable">Accounts Receivable</option>
+      <option value="Other Current Asset">Other Current Asset</option>
+      <option value="Fixed Asset">Fixed Asset</option>
+      <option value="Other Asset">Other Asset</option>
+    </optgroup>
+    <optgroup label="Liabilities and equity">
+      <option value="Accounts Payable">Accounts Payable</option>
+      <option value="Credit Card">Credit Card</option>
+      <option value="Other Current Liability">Other Current Liability</option>
+      <option value="Long Term Liability">Long Term Liability</option>
+      <option value="Equity">Equity</option>
+    </optgroup>
+  </select>
+  <div style="font-size:11px;color:var(--tx2);margin-top:6px">
+    Use colons for a sub-account, e.g. <i>Ticket Credits:MLB:Blue Jays</i>.
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button id="acctTypeCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="acctTypeGo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Create</button>
+  </div>
+</dialog>
+
+<dialog id="confirm3" style="max-width:420px">
+  <h3 id="c3Title"></h3>
+  <div id="c3Body" style="font-size:14px;line-height:1.45;text-align:center"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="c3Cancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 16px">Cancel</button>
+    <button id="c3Go"
+            style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                   border-radius:6px;padding:6px 16px;font-weight:600">Update</button>
+    <button id="c3GoAdd"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Update &amp; Add</button>
+  </div>
+</dialog>
+
+<dialog id="batch" style="max-width:430px">
+  <h3>Batch Actions</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:12px;text-align:center">
+    <b id="batchN"></b> selected.
+  </div>
+  <!-- Alphabetical. Any other order is a claim about which action matters
+       most, and the list is long enough now that scanning it beats guessing. -->
+  <div style="display:flex;flex-direction:column;gap:8px;text-align:center">
+    <button class="ghost batchOpt" data-a="code" style="padding:9px 12px">
+      <b>Add All</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Add each transaction with its current vendor and category.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="match" style="padding:9px 12px">
+      <b>Match All</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Match each transaction to its highest-ranked bill.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="release" style="padding:9px 12px">
+      <b>Return to For Review</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        For transactions flagged CHECK QBO, where Undo can't work because the
+        QuickBooks transaction is already gone. Writes nothing to QuickBooks.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="split" style="padding:9px 12px">
+      <b>Split Transactions</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Apply the same percentage split to selected transactions.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="undo" style="padding:9px 12px">
+      <b style="color:var(--bad)">Delete</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Delete each selected transaction.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="exclude" style="padding:9px 12px">
+      <b style="color:var(--bad)">Exclude</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Move each selected transaction to Excluded.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="unexclude" style="padding:9px 12px">
+      <b>Unexclude</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Send each selected transaction back to For Review.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="purge" style="padding:9px 12px">
+      <b style="color:var(--bad)">Delete Permanently</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Remove each selected transaction for good. Cannot be undone.</span>
+    </button>
+    <button class="ghost batchOpt" data-a="convert" style="padding:9px 12px">
+      <b>Convert Bill Payments to Expenses</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Delete selected bill payments and re-post as expenses.</span>
+    </button>
+    <!-- UPDATE FIELDS: Vendor, Category and Custom Notes in one window. -->
+    <button class="ghost batchOpt" data-a="fields" style="padding:9px 12px">
+      <b>Update Fields</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Set the vendor, category or custom notes across every selected transaction.</span>
+    </button>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button class="ghost" id="batchCancel"
+            style="background:var(--bad);color:#fff;border-color:var(--bad)">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="split" style="max-width:560px">
+  <h3>Split Transaction</h3>
+  <div id="splitHead" style="font-size:12px;color:var(--tx2);margin-bottom:10px;
+       text-align:center"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--tx2)">Split by</span>
+    <button class="ghost splitMode on" data-m="amount">Fixed Amount</button>
+    <button class="ghost splitMode" data-m="percent">Percentage</button>
+    <span style="flex:1"></span>
+    <span id="splitSum" style="font-size:12px;font-weight:600"></span>
+  </div>
+  <div id="splitLines" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="ghost" id="splitAdd" style="font-size:12px">+ Add Line</button>
+    <button class="ghost" id="splitEven" style="font-size:12px">Split Evenly</button>
+    <span style="flex:1"></span>
+    <button class="ghost" id="splitClear"
+            style="font-size:12px;border-color:var(--bad);color:var(--bad)"
+      >Remove Split</button>
+  </div>
+  <div class="dact" style="justify-content:center;margin-top:12px">
+    <button id="splitCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="splitSave"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600"></button>
+  </div>
+</dialog>
+
+<dialog id="rulebatch" style="max-width:470px">
+  <h3>Batch Actions</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:12px;text-align:center">
+    <b id="ruleBatchN"></b> selected.
+  </div>
+  <!-- One field at a time. A form that set four things at once would need a
+       "leave this alone" option on each, and the difference between that and a
+       real value is the thing nobody would notice getting wrong. -->
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="width:130px;font-size:13px">Bank Detail Rule</span>
+      <select id="rbDop" style="flex:1"></select>
+      <button class="rbGo" style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;padding:4px 12px;font-weight:600" data-f="detail_op" data-sel="rbDop">Apply</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="width:130px;font-size:13px">Amount Rule</span>
+      <select id="rbAop" style="flex:1"></select>
+      <button class="rbGo" style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;padding:4px 12px;font-weight:600" data-f="amount_op" data-sel="rbAop">Apply</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="width:130px;font-size:13px">Card Account</span>
+      <select id="rbCard" style="flex:1"></select>
+      <button class="rbGo" style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;padding:4px 12px;font-weight:600" data-f="card_account" data-sel="rbCard">Apply</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="width:130px;font-size:13px">Auto</span>
+      <select id="rbMode" style="flex:1"></select>
+      <button class="rbGo" style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;padding:4px 12px;font-weight:600" data-f="mode" data-sel="rbMode">Apply</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="width:130px;font-size:13px">Auto Add Refunds</span>
+      <select id="rbRef" style="flex:1">
+        <option value="false">No</option>
+        <option value="true">Yes</option>
+      </select>
+      <button class="rbGo" style="background:#15803d;color:#fff;border:1px solid #15803d;border-radius:6px;padding:4px 12px;font-weight:600" data-f="auto_add_refunds" data-sel="rbRef">Apply</button>
+    </div>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button class="ghost" id="ruleBatchCancel"
+            style="background:var(--bad);color:#fff;border-color:var(--bad)">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="billsplit" style="width:370px;max-width:370px">
+  <h3 style="margin-bottom:4px">Split Bill</h3>
+  <div id="bsHead" style="font-size:12px;color:var(--tx2);margin-bottom:8px;
+       text-align:center"></div>
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+    <button class="ghost bsMode on" data-m="amount">$</button>
+    <button class="ghost bsMode" data-m="percent">%</button>
+    <span style="flex:1"></span>
+    <!-- Fixed width: the running total grows and shrinks as figures are typed,
+         and letting it size the row made the whole dialog jump about. -->
+    <span id="bsSum" style="font-size:11px;font-weight:600;text-align:right;
+          width:180px;flex:none;line-height:1.25"></span>
+  </div>
+  <div id="bsLines" style="display:flex;flex-direction:column;gap:5px"></div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <button class="ghost" id="bsAdd" style="font-size:11px;padding:3px 9px">+ Part</button>
+    <button class="ghost" id="bsEven" style="font-size:11px;padding:3px 9px">Even</button>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button id="bsCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="bsGo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Split</button>
+  </div>
+</dialog>
+
+<dialog id="billmerge" style="max-width:560px">
+  <h3>Merge Bills</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;
+       text-align:center">
+    Choose the bill to keep. The line descriptions and amounts from the other
+    bills are added as additional lines to this bill, and the other bills are
+    deleted.
+  </div>
+  <div id="mergeList" style="max-height:210px;overflow:auto;
+       border:1px solid var(--line);border-radius:7px;padding:4px;
+       margin-bottom:10px"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="mergeCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="mergeGo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Merge</button>
+  </div>
+</dialog>
+
+<dialog id="billbatch" style="max-width:430px">
+  <h3>Batch Actions</h3>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:12px;text-align:center">
+    <b id="billBatchN"></b> selected.
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;text-align:center">
+    <!-- UPDATE FIELDS: Vendor and Amount in one window. -->
+    <button class="ghost billBatchOpt" data-a="fields" style="padding:9px 12px">
+      <b>Update Fields</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Set the vendor or change the amount across every selected bill.</span>
+    </button>
+    <button class="ghost billBatchOpt" data-a="split" style="padding:9px 12px">
+      <b>Split Bills</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Divide each selected bill by the same percentages. Single-line bills
+        only, and it can not be undone.</span>
+    </button>
+    <button class="ghost billBatchOpt" data-a="merge" style="padding:9px 12px">
+      <b>Merge Bills</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Fold other bills into the bill that is kept. Vendors must be the same.</span>
+    </button>
+    <button class="ghost billBatchOpt" data-a="delete" style="padding:9px 12px">
+      <b style="color:var(--bad)">Delete Bills</b><br>
+      <span style="font-size:11px;color:var(--tx2)">
+        Can not be undone, and any bill with a payment against it is refused.</span>
+    </button>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button class="ghost" id="billBatchCancel"
+            style="background:var(--bad);color:#fff;border-color:var(--bad)">Cancel</button>
+  </div>
+</dialog>
+
+<!-- A width, not just a max-width: a dialog sizes to its content, so
+     max-width alone left this one as narrow as the word "Cancel" and it
+     read as a fragment rather than a form. -->
+<dialog id="asktext" style="width:420px;max-width:92vw">
+  <h3 id="askTextTitle">Enter a name</h3>
+  <div id="askTextBody" class="why" style="text-align:center;margin:0 0 10px"></div>
+  <input id="askTextInput" style="width:100%" autocomplete="off">
+  <!-- Asked here rather than in a second dialog: the name and the type are one
+       decision about one account, and splitting them meant answering half a
+       question before seeing the other half. -->
+  <!-- Not full width. `dialog select` is 100% by default, which stretched a
+       two-option menu across the whole box and made it look like a second text
+       field. Overridden inline so the rule for every other dialog stands. -->
+  <!-- Two labeled rows rather than a bare select. With one unlabeled
+       dropdown it was obvious what it meant; with two it was not, and the
+       subaccount list in particular reads as nothing without its label. -->
+  <!-- Both rows left aligned, labels the same width and selects the same
+       width, so the two lines form a column rather than two centerd rows that
+       happen to sit near each other. -->
+  <div id="askTextKindWrap" style="display:none;margin-top:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <label style="font-size:12px;color:var(--tx2);width:96px;flex:none;
+                    text-align:left">Account Type</label>
+      <select id="askTextKind" style="flex:1;min-width:0"></select>
+    </div>
+  </div>
+  <div id="askTextParentWrap" style="display:none;margin-top:8px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <label style="font-size:12px;color:var(--tx2);width:96px;flex:none;
+                    text-align:left">Subaccount</label>
+      <select id="askTextParent" style="flex:1;min-width:0">
+        <option value="">None</option>
+      </select>
+    </div>
+  </div>
+  <div class="dact" style="justify-content:center">
+    <button id="askTextCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="askTextOk"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">OK</button>
+  </div>
+</dialog>
+
+<dialog id="cardsettings" style="max-width:340px">
+  <h3>Primary Checking Account</h3>
+  <div id="cardSettingsBody"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="cardSettingsCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px">Cancel</button>
+    <button id="cardSettingsSave"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Save</button>
+  </div>
+</dialog>
+
+<dialog id="listpick" style="max-width:380px">
+  <h3 id="listpickTitle">Choose</h3>
+  <input id="listpickSearch" placeholder="Type to narrow…" autocomplete="off"
+         style="width:100%;font-size:13px;padding:5px 7px;margin-bottom:6px">
+  <div id="listpickList" style="max-height:300px;overflow:auto"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="listpickCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 16px">Cancel</button>
+    <button id="listpickBack"
+            style="display:none;background:var(--accent);color:#fff;
+                   border:1px solid var(--accent);border-radius:6px;
+                   padding:6px 16px">Go Back</button>
+    <button id="listpickGo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Select</button>
+  </div>
+</dialog>
+
+<!-- 320px was the reason a two-sentence message kept wrapping to three lines:
+     no measure set on the text could beat a box that narrow. -->
+<dialog id="notice" style="max-width:400px;border:1px solid var(--line);
+        border-radius:10px;padding:18px 20px;box-shadow:0 10px 30px rgba(0,0,0,.15)">
+  <div id="noticeTitle" style="font-weight:600;margin-bottom:6px;
+       text-align:center"></div>
+  <div id="noticeBody" style="font-size:14px;line-height:1.45;text-align:center"></div>
+  <div style="display:flex;justify-content:center;margin-top:14px">
+    <button id="noticeOk"
+            style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                   border-radius:6px;padding:5px 22px">OK</button>
+  </div>
+</dialog>
+
+<dialog id="warn" style="max-width:420px">
+  <h3 id="warnTitle">Check the file</h3>
+  <div id="warnBody" style="font-size:13px;line-height:1.5"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="warnOk"
+            style="background:var(--accent);color:#fff;border:1px solid var(--accent);
+                   border-radius:6px;padding:6px 20px">OK</button>
+  </div>
+</dialog>
+
+<!-- Wider and taller. Seven columns of bills in 1080px meant the memo --
+     which is often what tells two bills apart -- was a sliver, and the list
+     showed six rows at a time out of dozens. -->
+<dialog id="fmatch" style="width:1560px;max-width:98vw">
+  <h3>Force match to a bill</h3>
+  <div class="why" id="fmWho" style="margin-bottom:8px"></div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <input id="fmFind" placeholder="Search…" title="Searches every column: bill number, vendor, date, amount, balance and memo"
+           autocomplete="off" style="width:260px;font-size:13px;padding:6px 9px">
+    <!-- "Apply oldest first" and the running total share a text baseline,
+         so they read as one line. -->
+    <span style="display:inline-flex;align-items:baseline;gap:18px;margin-left:6px">
+    <label style="font-size:12px;white-space:nowrap;cursor:pointer;line-height:16px"
+      title="Filter to one vendor first. Pays that vendor's open bills oldest
+first until the payment is used up; the last one is usually paid in part.">
+      <input type="checkbox" id="fmOldest" style="width:auto;margin:0 5px 0 0;vertical-align:-2px">Apply oldest first</label>
+    <span id="fmTot" style="font-size:12px;color:var(--tx2);white-space:nowrap;line-height:16px"></span>
+    </span>
+  </div>
+  <div style="margin:10px 0 4px;font-size:13px">
+    <div style="font-weight:600;margin-bottom:4px">If the amounts differ</div>
+    <label style="display:block;margin-bottom:3px;cursor:pointer">
+      <input type="radio" name="fmMode" value="keep" checked style="width:auto">
+      Leave the bill as it is and pay only what the charge covers</label>
+    <label style="display:block;margin-bottom:3px;cursor:pointer">
+      <input type="radio" name="fmMode" value="adjust" style="width:auto">
+      Adjust the bill to the charge amount</label>
+    <label style="display:block;cursor:pointer"
+      title="The bill's own line is left as it is, and the difference is added
+             as a second line on the Other Fees account. Only when the charge is
+             larger than the bill; a larger bill has its amount adjusted.">
+      <input type="radio" name="fmMode" value="fees" style="width:auto">
+      Add the difference to the bill as an Other Fees line</label>
+  </div>
+  <!-- A FIXED height, not a maximum. As a max-height the box shrank to fit
+       whatever the search had narrowed the list to, so the dialog resized and
+       the buttons jumped on every keystroke -- and the list you were reading
+       moved under the cursor. Fixed, the panel stays put and short results
+       simply leave space. -->
+  <div id="fmList" style="height:min(56vh,560px);overflow:auto;margin-top:8px"></div>
+
+  <div class="err" id="fmErr"></div>
+  <div class="dact">
+    <button id="fmCancel" style="background:var(--bad);color:#fff;
+            border:1px solid var(--bad);border-radius:6px;padding:6px 18px;
+            font-weight:600">Cancel</button>
+    <button id="fmDo" disabled style="background:#15803d;color:#fff;
+            border:1px solid #15803d;border-radius:6px;padding:6px 18px;
+            font-weight:600">Force Match</button>
+  </div>
+</dialog>
+
+<dialog id="rsplit" style="max-width:560px">
+  <h3>Split Categories</h3>
+  <div id="rsplitWho" style="font-size:12px;color:var(--tx2);margin-bottom:10px;
+       text-align:center"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--tx2)">Percentages — the rule applies
+      to charges of different sizes</span>
+    <span style="flex:1"></span>
+    <span id="rsplitTot" style="font-size:12px;font-weight:600"></span>
+  </div>
+  <div id="rsplitBody" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="ghost" id="rsplitAdd" style="font-size:12px">+ Add Line</button>
+    <button class="ghost" id="rsplitEven" style="font-size:12px">Split Evenly</button>
+    <span style="flex:1"></span>
+    <button class="ghost" id="rsplitClear"
+            style="font-size:12px;border-color:var(--bad);color:var(--bad)"
+      >Remove Split</button>
+  </div>
+  <div class="err" id="rsplitErr"></div>
+  <div class="dact" style="justify-content:center;margin-top:12px">
+    <button id="rsplitCancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 18px;font-weight:600">Cancel</button>
+    <button id="rsplitSave"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 18px;font-weight:600">Save</button>
+  </div>
+</dialog>
+
+<dialog id="up" style="width:480px">
+  <h3 style="text-align:center">Upload Transactions from CSV</h3>
+  <label style="text-align:center;display:block">Card Account</label>
+  <button class="cellsel-static" id="upScrPick" data-value=""
+          style="width:300px;margin:4px auto 14px;padding:8px 12px;font-size:13px;
+                 border:1px solid var(--line);background:var(--card);
+                 border-radius:8px">
+    <span class="cs-v" style="text-align:left"
+      ><i style="color:var(--tx2)">Select One…</i></span>
+    <span class="cs-c">▾</span></button>
+  <input type="hidden" id="usrc" value="">
+  <div style="display:flex;gap:14px;justify-content:center;margin-bottom:18px">
+    <label style="font-size:12px;font-weight:600;text-align:center">Start Date (optional)<br>
+      <input id="uDateStart" type="date"
+             style="width:150px;font-size:13px;margin-top:3px"></label>
+    <label style="font-size:12px;font-weight:600;text-align:center">End Date (optional)<br>
+      <input id="uDateEnd" type="date"
+             style="width:150px;font-size:13px;margin-top:3px"></label>
+  </div>
+  <div id="upDrop" tabindex="0" role="button"
+       style="border:2px dashed #94a3b8;border-radius:12px;padding:34px 20px;
+              cursor:pointer;background:#eef2f7;text-align:center">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px"
+         id="upDropTitle">Drop your file here</div>
+    <div class="why" style="margin:0">or click to choose — .csv, .xlsx</div>
+  </div>
+  <input id="ufile" type="file" accept=".csv,.xlsx,.xls,.xlsm" style="display:none">
+  <div id="ufilewarn" style="font-size:12px;color:var(--tx2);margin-top:8px;
+       text-align:center"></div>
+  <div class="err" id="uerr"></div>
+  <div class="dact" style="justify-content:center">
+    <button id="ucancel"
+            style="background:var(--bad);color:#fff;border:1px solid var(--bad);
+                   border-radius:6px;padding:6px 16px">Cancel</button>
+    <button id="udo"
+            style="background:#15803d;color:#fff;border:1px solid #15803d;
+                   border-radius:6px;padding:6px 16px;font-weight:600">Upload</button>
+  </div>
+</dialog>
+
+<!-- Plaid Link. Loaded from Plaid's CDN because it MUST be: the cardholder
+     types their bank password into an iframe Plaid serves, and nothing here
+     ever sees it. That is the point of the flow, not an implementation detail
+     -- self-hosting the widget would mean handling those credentials. Loaded
+     lazily by openPlaidLink so an offline CDN cannot delay the whole app. -->
+<script src="/static/app.js?v=8dc3833c" defer></script>
+</body>
+</html>

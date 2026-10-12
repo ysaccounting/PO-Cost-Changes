@@ -1,0 +1,1806 @@
+:root{--h-header:0px;--h-nav:0px;--grid-top:220px;--bg:#f7f7f5;--card:#fff;--line:#e5e4e0;--tx:#1f1f1d;--tx2:#6b6a65;
+--accent:#2d6a8f;--ok:#1d7a52;--warn:#7a5410;--bad:#a33;--chip:#f0efec;}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+background:var(--bg);color:var(--tx)}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--card)}
+
+/* login */
+/* Hidden until the token has been checked. It used to be visible in the
+   markup and hidden by script once auth resolved, so every refresh with a
+   valid session painted the sign-in box for a frame first. */
+/* SIGN IN -- a SPLIT SCREEN: form on the left, artwork on the right.
+   ------------------------------------------------------------------------
+   THE APP'S OWN PALETTE, not a new one: --bg for the form side, --accent for
+   the artwork and the button, --ok for the rule under the wordmark. Earlier
+   passes used a dark navy and then a forest green, neither of which this app
+   contains anywhere else -- a sign-in screen that introduces its own color
+   world is a sign-in screen from a different product.
+
+   The artwork is stored as an ALPHA MASK (LA, no color) and tinted here with
+   background + mask-image. It is one ink at varying opacity, so a truecolor
+   RGBA file was paying for sixteen million colors to store one: 895 KB became
+   251 KB for exactly the same picture, and the tint is now a single line to
+   change rather than a re-export.
+
+   The source is 320 x 171 -- an Adobe Stock comp preview. On its own panel it
+   is enlarged around three times rather than the five or six that bleeding it
+   across the whole window cost, which is most of why the split reads better
+   than the full bleed did. What makes it acceptable at all is that it is a
+   MASK of flat line art, not a photograph: enlarging softens edges but cannot
+   produce color noise or blocking. If a licensed full-resolution file
+   (better still, the EPS or SVG) turns up it is a one-file swap -- nothing
+   here depends on the pixel dimensions. */
+#loginbg{
+  --lg-art:var(--accent);
+  display:none;position:fixed;top:0;right:0;bottom:0;left:50%;z-index:0;
+  overflow:hidden;border-left:1px solid var(--line);
+  background:linear-gradient(160deg,#eef1f3 0%,#e8ecef 55%,#e3e8ec 100%)}
+
+/* CONTAIN, not cover. The panel is tall and narrow and the drawing is nearly
+   two to one wide, so covering it would crop away the grandstand on one side
+   and the track on the other and leave the middle third -- the part that says
+   least. Contained, the whole scene reads, and the space above and below is
+   the panel doing its job. */
+/* THE LOCOMOTIVE.
+   Fills the panel, in the app's own palette rather than a stock photo's. Every
+   moving part is CSS on an SVG group, so there is nothing to download and
+   nothing to buffer. */
+/* THE SKY IS THE PANEL. Painted here rather than inside the SVG so it reaches
+   the top of the window: as a rect in the drawing it stopped wherever the
+   drawing did, leaving plain gray above it.
+   The stops are placed so the pale end lands near the horizon, which is where
+   the drawing sits. */
+/* ONE GRADIENT, no ground band.
+   A band at a fixed percentage only lines up with the rails at one window
+   height: the drawing is centerd and scales with the panel's WIDTH, so the
+   rail line moves against any percentage as the window changes shape. The
+   drawing carries its own ground instead, and the panel just fades to the
+   palest sky tone behind it. */
+#loginbg{background:linear-gradient(180deg,#bcd9ee 0%,#cfe3f2 40%,
+         #e4eff7 72%,#eef5fa 100%)}
+
+/* CENTERD, level with the sign-in box across the fold. Bottom-aligned it sat
+   lower than the form and the two read as unrelated; the pairing is the point,
+   so the drawing sits at the same height as the thing it is beside. */
+/* -34.2% across, -46% down. Across: the engine's center, not the
+   drawing's, sits on the panel center -- see the width note below.
+   Down: -47.7% puts the SCALED train's middle (y = 187: it runs from
+   the chimney at 133 to the rail at 242) level with the sign-in box.
+   Recompute it whenever the train's scale changes.
+   The viewBox runs from -70 to 470 -- sky above the clouds, grass past
+   the bottom of the panel -- so the DRAWING's center is nowhere near the
+   TRAIN's. The train sits at about 46% of that span, and this is the offset
+   that keeps it level with the sign-in box. Recomputed whenever the box
+   changes; a stale value here is the train drifting up or down the panel. */
+#loginbg .lomo{position:absolute;left:50%;top:50%;bottom:auto;
+  /* NO PIXEL CAP. min(122%,980px) stopped the drawing at 980px, so on any
+     panel wider than that it sat in the middle with the panel's own sky
+     showing down both sides. It is a background: it should cover the panel at
+     every width, and the overhang is cropped rather than letterboxed. */
+  width:166.6%;height:auto;transform:translate(-34.2%,-47.7%)}
+/* THE BACKGROUND, in rock and cloud colors rather than a tint of the
+   locomotive's blue.
+   Distance still reads as paleness -- the far range is lighter and cooler than
+   the near one, which is what haze does -- but they are now slate gray-greens
+   rather than the accent at low opacity, which made the hills look like a
+   faded copy of the train. Clouds are near-white with the faintest gray, so
+   they read as cloud against the panel rather than as holes in it. */
+.mtn-far{fill:#9fb0bf}
+.mtn-near{fill:#6e8394}
+.snow{fill:#f4f7f9}
+.cloud ellipse{fill:#ffffff}
+
+/* The clouds drift. Slowly -- a full crossing takes minutes, so it registers
+   as weather rather than as something happening. Each starts at a different
+   point of the same journey, which is cheaper than three animations and keeps
+   them from ever lining up. */
+/* STILL, and placed. The clouds are scenery, not motion.
+
+   They were drawn centerd on x = 0 because the drift animation carried each
+   one across the sky, with staggered delays spreading them out. Stopping the
+   drift left all three stacked on that shared start at the far left edge. Each
+   now has its own position in the markup, set by a transform ATTRIBUTE, which
+   nothing here overrides because no rule sets `transform` on a cloud. */
+.cloud{animation:none}
+/* Height is set on the ellipses, NOT here: an animation that sets `transform`
+   replaces any `transform` on the same element, so a translate(0,54px) here
+   would be discarded the moment the drift started and the cloud would snap to
+   the top of the panel -- the same fault the bogie wheels had. */
+
+.lo-body{fill:var(--accent)}
+.lo-panel{fill:rgba(255,255,255,.22)}
+.lo-glass{fill:rgba(255,255,255,.55)}
+.lo-wheel{fill:#1f3d52}
+.lo-hub{fill:rgba(255,255,255,.75)}
+.spokes rect{fill:rgba(255,255,255,.4)}
+.lo-rod{fill:#c2410c}
+/* Grass, and the scrub on it. Muted rather than a bright green: this sits
+   behind a password field, and the only job the color has is to stop the
+   bottom of the panel reading as empty. The scrub is a shade darker than the
+   grass and slightly transparent, so the clumps read as texture rather than
+   as separate objects. */
+.grass{fill:#9db98f}
+.scrub ellipse{fill:#7ea070;opacity:.85}
+.lo-rail{fill:rgba(31,61,82,.55)}
+
+
+/* Wheels turn about their own centers, so each is positioned by transform and
+   the spin is applied to an inner group -- rotating the wheel itself would
+   swing it around the origin instead. */
+.wheel{transform-box:fill-box;transform-origin:center}
+.w1{transform:translate(128px,212px)}
+.w2{transform:translate(248px,212px)}
+/* The cars' wheels are placed by an SVG transform attribute in the
+   markup, one per wheel, so there is no rule per wheel here to keep in
+   step with the drawing. */
+/* EVERY wheel spins its inner group, never itself: an animation that sets
+   `transform` replaces the one that positions the wheel, and the wheel lands
+   at the SVG origin. */
+.wheel .spokes{animation:lo-spin 1.1s linear infinite;
+  transform-box:fill-box;transform-origin:center}
+/* COUNTER-CLOCKWISE. The engine faces left, so it travels left, and a wheel
+   rolling leftward turns counterclockwise. Clockwise made it look like it was
+   reversing while pointing forward. */
+@keyframes lo-spin{to{transform:rotate(-360deg)}}
+
+/* The rod rises and falls with the crank rather than merely sliding, which is
+   what stops it looking like a bar drifting across the wheels. */
+.rodwrap{animation:lo-rod 1.1s linear infinite}
+@keyframes lo-rod{
+  0%{transform:translate(0,208px)}   25%{transform:translate(-9px,216px)}
+  50%{transform:translate(0,224px)}  75%{transform:translate(9px,216px)}
+  100%{transform:translate(0,208px)}}
+
+
+.ties rect{fill:rgba(31,61,82,.28)}
+/* One sleeper-pitch per loop, so the repeat is seamless. */
+.ties{animation:lo-track 1.1s linear infinite}
+/* LEFT TO RIGHT: the ground under a left-moving train. Run from -60 to 0 so
+   the sleeper entering at the left edge is one already drawn, and the loop
+   stays seamless. */
+@keyframes lo-track{from{transform:translateX(-60px)}to{transform:translateX(0)}}
+
+/* Still, not absent, for anyone who has asked their system not to animate:
+   the drawing is the point and the motion is the flourish. */
+@media (prefers-reduced-motion: reduce){
+  .wheel .spokes,.rodwrap,.ties,.cloud{animation:none}
+  .rodwrap{transform:translate(0,216px)}
+}
+
+/* One or the other: the stock artwork is generated content and paints over a
+   real child, so shown together the locomotive would be invisible beneath it. */
+#loginbg::after{display:none !important}
+@supports ((-webkit-mask-image:url("")) or (mask-image:url(""))){
+  #loginbg::after{
+    content:"";display:block;position:absolute;inset:0;
+    background:var(--lg-art);opacity:1;
+    -webkit-mask:url("/static/racecar.png") center / 88% auto no-repeat;
+            mask:url("/static/racecar.png") center / 88% auto no-repeat}
+}
+
+
+/* The card, centerd in the LEFT half.
+   Fixed and translated rather than margin-centerd, because the sign-in box
+   changes height between its three states -- password, two-factor code, forgot
+   password -- and a margin that centers one of them centers neither of the
+   others. */
+#login{display:none;position:fixed;top:50%;left:25%;
+  transform:translate(-50%,-50%);z-index:1;
+  width:470px;max-width:calc(50vw - 40px);max-height:90vh;overflow:auto;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:52px 56px 46px;
+  box-shadow:0 18px 44px rgba(31,31,29,.10),0 2px 6px rgba(31,31,29,.06)}
+
+/* NARROW: stack it. Below this the two halves are each too thin to hold
+   anything -- a 400px card cannot fit in half a phone -- so the artwork
+   becomes a band across the top and the form takes the full width beneath it.
+   Hiding the picture entirely would be simpler and would also throw away the
+   only thing telling you which product you are signing in to. */
+@media (max-width:900px){
+  #loginbg{left:0;bottom:auto;height:34vh;border-left:none;
+    border-bottom:1px solid var(--line)}
+  #loginbg::after{opacity:.55;
+    -webkit-mask-size:auto 82%;mask-size:auto 82%}
+  #login{position:static;transform:none;margin:calc(34vh + 32px) auto 40px;
+    max-width:92vw;max-height:none}
+}
+/* Shorter than the card is tall: the band would take space the form needs. */
+@media (max-height:560px){
+  #loginbg{display:none !important}
+  #login{position:static;transform:none;margin:24px auto;max-width:92vw}
+}
+
+/* The wordmark, in the same skewed treatment the header uses -- the first
+   thing on the page should be the thing you came to. */
+#login .lmark{display:block;text-align:center;color:var(--accent);
+  font-weight:800;font-size:52px;letter-spacing:.01em;
+  margin:0 0 26px}
+/* A green hairline under the wordmark: the app's second accent, used once. */
+#login .lmark::after{content:"";display:block;width:78px;height:4px;
+  margin:12px auto 0;background:var(--ok);border-radius:2px}
+#login h1{font-size:24px;margin:0 0 6px;text-align:center;font-weight:700;
+  color:var(--tx)}
+#login p{color:var(--tx2);font-size:13px;margin:0 0 20px;text-align:center}
+#login input{width:100%;margin-bottom:14px;padding:13px 14px;font-size:15px;
+  border:1px solid var(--line);border-radius:7px;background:var(--card)}
+#login input:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(45,106,143,.16)}
+#login button{width:100%;background:var(--accent);color:#fff;
+  border:1px solid var(--accent);border-radius:7px;padding:14px;font-size:15px;
+  font-weight:600;cursor:pointer}
+#login button:hover{filter:brightness(1.08)}
+#login label{text-align:left}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px}
+
+/* app */
+#app{display:none}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:4px 20px;
+/* Above the sticky tab and filter rows (32 and 31). At 5 anything dropping out
+   of the header -- the Tables menu -- was painted behind them. */
+display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:40;
+position:sticky;overflow:visible}
+header{position:sticky;isolation:isolate}
+header h1{font-size:15px;font-weight:600;margin:0}
+.spacer{flex:1}
+.cowrap{display:flex;align-items:center;gap:9px}
+.brand{display:flex;align-items:center;color:var(--accent);
+/* skew rather than the font's own italic: most UI stacks fake it with a gentle
+   slope, and this is the angle a wordmark wants. */
+font-style:normal;font-weight:800;font-size:48px;letter-spacing:.02em;white-space:nowrap;
+/* No longer centerd: it sits at the right-hand end, ahead of Sign out, so the
+   left of the bar belongs entirely to the company and the screen buttons. */
+padding:4px 14px 4px 6px}
+.brand svg{flex:none;display:block;overflow:visible}
+header{padding-top:4px;padding-bottom:4px;overflow:visible;position:relative}
+header{position:sticky;top:0}
+header{overflow:visible}
+.cowrap label{font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em}
+/* As wide as the company shown, not a fixed 290px; the open list widens to
+   the longest name (below). */
+#company{font-size:17px;font-weight:600;padding:8px 14px;min-width:150px;max-width:340px;
+field-sizing:content;
+border:2px solid var(--accent);border-radius:9px;color:var(--accent);background:#fff}
+.who{font-size:13px;color:var(--tx2)}
+/* The signed-in name reads as content, not as a hint. */
+.signout .who{color:var(--tx)}
+/* Name over button, so the pair reads as one thing rather than two controls. */
+/* The name sits ABOVE the row rather than inside it, so Sign out keeps the
+   same baseline as every other button in the bar. */
+.signout{position:relative;display:inline-flex;align-items:center}
+.avatar{width:34px;height:34px;border-radius:50%;border:1px solid #b8860b;
+  background:#d4a017;color:#fff;font-weight:700;font-size:15px;
+  letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;padding:0}
+.avatarmenu{display:none;position:absolute;right:0;top:40px;z-index:40;
+  background:var(--card);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 6px 20px rgba(0,0,0,.12);padding:6px;width:max-content;
+  min-width:0}
+.avatarmenu .who{font-size:11px;color:var(--tx2);padding:5px 9px;
+  border-bottom:1px solid var(--line);margin-bottom:4px;white-space:nowrap}
+.avatarmenu button{width:100%;text-align:left;font-size:13px;padding:6px 9px;
+  border:none;background:none;border-radius:5px;cursor:pointer}
+.avatarmenu button:hover{background:var(--chip)}
+.signout .who{display:none;position:absolute;bottom:100%;left:0;right:0;text-align:center;
+  line-height:1.2;margin-bottom:2px;white-space:nowrap}
+.ghost{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:6px 11px}
+/* A control that's narrowing the grid says so. White next to white meant the
+   only way to know a filter was on was to open the panel and look. */
+/* Everything in the two bands goes EXCEPT the button that brings them back --
+   it stays in the filter row, which is kept visible but collapsed to just that
+   one control. Hiding the row outright left no way to unhide it. */
+/* The toggle sits in the grid's own icon bar now, which never hides -- so
+   collapsing can simply remove both bands and there is nothing to reposition. */
+body.bands-hidden nav,body.bands-hidden .filters,
+body.bands-hidden #activefilters{display:none}
+.fchip{background:var(--chip);padding:2px 4px 2px 9px;border-radius:20px;
+  display:inline-flex;align-items:center;gap:2px}
+.fchip-x{background:none;border:none;color:var(--tx2);cursor:pointer;
+  font-size:14px;line-height:1;padding:0 5px}
+.fchip-x:hover{color:var(--bad)}
+/* ONE LIGHT BLUE for every filter control that is narrowing a grid -- the
+   tint the Payment Plans grid uses for a set charge day. */
+.filters .on,.filters select.on,.filters button.on{background:#e8f1fb;
+  border-color:#bcd9ee;color:var(--accent);font-weight:600}
+/* The tab row and the filter row stay put while the grid scrolls: which tab
+   you're on and what's filtering it are the two things you need to know at row
+   400 as much as at row 1. Both sit under the header, which is already sticky,
+   so each is offset by the height of what's above it. */
+nav{display:flex;gap:5px;padding:16px 20px 10px;align-items:center;
+  position:sticky;top:var(--h-header);z-index:32;background:var(--bg)}
+nav button{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:7px 14px;color:var(--tx)}
+nav button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+header button.ghost.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* THE SAME TREATMENT FOR A TOOLBAR BUTTON THAT IS IN USE. Only header buttons
+   were styled for `.on`, so the Filters button could be marked active and look
+   exactly like an idle one -- a narrowed grid that reads as the whole list. */
+#moreFilters.on,#auditFilters.on,#billFiltersBtn.on{
+  background:#e8f1fb;color:var(--tx);border-color:#bcd9ee}
+/* Divides the tabs that filter the feed from the actions that act on it. */
+.navsep{width:3px;align-self:stretch;background:var(--tx);margin:0 10px;
+  border-radius:2px}
+.feedtitle{font-size:17px;margin:0 14px 0 0;white-space:nowrap;font-weight:700}
+.screen{display:none;padding:14px 20px 30px}
+/* The feed's nav, not every nav on the page -- the Tables toggles are a nav
+   too, and this hid them, which is why that screen showed one grid and no way
+   to reach the others. */
+/* Everything belonging to the feed. The open filter panel was missing from
+   this list, so it stayed on screen above the Tables and Audit Log grids --
+   and since it is shown with an inline display:block, the rule needs
+   !important to override it. */
+/* Card Accounts is a feed TAB, so the feed's nav must stay -- only the grid
+   and its filters go. Applied as a class before anything renders, or the queue
+   paints for a moment on refresh and then gets replaced. */
+body.cards-open .filters,body.cards-open #activefilters,
+body.cards-open #advfilters,body.cards-open #billfilters,
+body.cards-open #gridicons,body.cards-open #colhead,body.cards-open #list,
+body.cards-open #bulkinline,body.cards-open #billbulk{display:none !important}
+
+/* QBO Sync hides the feed's tab row, like every other screen. This selector
+   had been separated from its own {display:none} block by the rule below,
+   which swept it into a `display:flex !important` -- so QBO Sync was actively
+   TOLD to show the feed's navigation, and drew both rows at once. */
+body.cards-open nav:not(.screentabs){display:none !important}
+
+/* THE FEED'S OWN TAB ROW STAYS while its Bank Feed Rules view is open.
+   That view is a tab of the feed, not a screen away from it -- hiding the row
+   that contains the button you just pressed leaves no way back and no sign of
+   where you are. */
+body.coding-open nav:not(.screentabs){display:flex !important}
+body.coding-open .filters,body.coding-open #activefilters,
+body.coding-open #gridicons,body.coding-open #colhead,
+body.coding-open #list,body.coding-open #pager{display:none !important}
+body.screen-open nav:not(.screentabs),
+body.screen-open .filters,body.screen-open #activefilters,
+body.screen-open #advfilters,body.screen-open #billfilters,
+body.screen-open #gridicons,body.screen-open #colhead,body.screen-open #list,
+body.screen-open #bulkinline,body.screen-open #billbulk{display:none !important}
+
+.screenhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  margin-bottom:12px}
+.screenhead h2{font-size:17px;margin:0;white-space:nowrap;font-weight:700}
+.screentools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.screentabs{display:flex;gap:6px;padding:0;border:none;background:none;
+  position:static}
+/* Same shape as the feed tabs -- they do the same job on a different screen. */
+/* Copied from the feed tabs so the two rows are interchangeable at a glance. */
+.screentabs button{font-size:14px;padding:7px 14px;border:1px solid var(--line);
+  background:var(--card);border-radius:9px;cursor:pointer;font-family:inherit;
+  color:var(--tx)}
+.screentabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* NO overflow:hidden. It was here only to clip the rounded corners, and it
+   created a clipping context on the table itself -- which silently disables
+   position:sticky on that table's own <th>. Three attempts at freezing these
+   headings failed on this one declaration. The corners are rounded on the
+   first and last header cells instead, which needs no clipping. */
+/* separate, not collapse: a sticky <th> is ignored inside a collapsed table,
+   which is why these headers scrolled away while the transaction grids' stayed.
+   Spacing is zeroed so it still reads as collapsed. */
+.gridtable{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;
+  background:var(--card);border:1px solid var(--line);border-radius:8px}
+.gridtable tr:first-child th:first-child{border-top-left-radius:8px}
+.gridtable tr:first-child th:last-child{border-top-right-radius:8px}
+/* Every header is a drag target on its right edge, so these grids resize the
+   same way the feed does. Widths are per grid and kept for the session. */
+/* Same color as the main grid's headers -- the gray read as disabled next to
+   the black headings everywhere else. */
+/* The audit grid's header cells join this rule rather than restating it. They
+   had their own size, color, weight and case, which is how a header ends up
+   looking like it belongs to a different product. */
+.gridtable th,#auditGrid .ahead > span{
+  text-align:left;font-size:13px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--tx);font-weight:600}
+.gridtable th{position:sticky;top:0;z-index:12;
+  background:var(--card);box-shadow:inset 0 -1px 0 var(--line);
+  padding:7px 10px;
+  border-bottom:1px solid var(--line);background:var(--bg)}
+.gridtable td{padding:6px 10px;border-bottom:1px solid var(--line)}
+.gridtable tr:last-child td{border-bottom:none}
+/* Sized to its content, not the window. These grids have four or five short
+   columns, and stretching them across a wide screen leaves the last column
+   marooned a meter from the first. */
+.gridtable{table-layout:fixed;width:auto;min-width:520px;max-width:100%}
+#tablesGrid .gridtable{max-width:900px}
+/* The rules table is not bound by the 900px above -- it has ten columns. */
+#tablesGrid .rulegrid{max-width:none}
+/* The rules table carries ten columns, several of them pickers. 900px squeezed
+   every one of them to a few characters. */
+#tablesGrid .rulegrid{max-width:none;width:max-content;table-layout:fixed}
+/* The alias, ignored-word and exception grids get the same treatment: fixed
+   layout with no width floor, so narrowing one column narrows the table
+   instead of widening its neighbors. */
+#tablesGrid .gridtable{table-layout:fixed;width:max-content}
+/* Both axes: the table scrolls sideways for its ten columns and the panel
+   scrolls down through the rules, with the headings pinned so column five is
+   still identifiable on row forty. */
+#tablesGrid:has(.rulegrid){overflow:auto;height:calc(100vh - 210px)}
+/* border-collapse:collapse defeats position:sticky on <th> -- the header
+   simply scrolls away, which is why freezing it never took however the
+   overflow was arranged. separate + border-spacing:0 looks identical and lets
+   sticky work; the borders move onto the cells to keep the same lines. */
+/* Every table grid gets the same treatment as the Bank Feed: headings left,
+   padded to sit over their column, and frozen when the panel scrolls. */
+#tablesGrid .rulegrid,#auditGrid .gridtable,#cardsGrid .gridtable{
+  border-collapse:separate;border-spacing:0}
+#tablesGrid .rulegrid th,#auditGrid .gridtable th,#cardsGrid .gridtable th,
+#tablesGrid .rulegrid td,#auditGrid .gridtable td,#cardsGrid .gridtable td{
+  border-bottom:1px solid var(--line)}
+#tablesGrid .rulegrid{border-collapse:separate;border-spacing:0}
+#tablesGrid .rulegrid th,#tablesGrid .rulegrid td{
+  border-bottom:1px solid var(--line)}
+#tablesGrid .rulegrid th{position:sticky;top:0;z-index:3;
+  box-shadow:inset 0 -1px 0 var(--line)}
+/* Same treatment for the audit log: it is the longest grid in the app and the
+   headings were off screen within a dozen rows. */
+/* height, not max-height. With max-height the panel only scrolls once its
+   content exceeds it -- until then the PAGE scrolls, taking the sticky header
+   out of view with it. A fixed height makes this element the scroller every
+   time, which is what freezes the headings. */
+/* THE SAME SHAPE AS THE BANK FEED.
+   There, #gridicons sits OUTSIDE #gridscroll -- the toolbar is above the
+   scrolling region and simply never moves, and #colhead sticks at top:0 inside
+   it. The audit log had the toolbar INSIDE the scroller and three sticky rows
+   stacked with measured offsets, which is a lot of machinery to reproduce
+   "do not scroll this bit", and it drifted by a few pixels whenever any of the
+   three changed height -- which is the header appearing mid-grid. */
+#cardsGrid{overflow:auto;height:calc(100vh - 230px)}
+#auditGrid{overflow:visible}
+#auditRows{overflow:auto;height:calc(100vh - var(--audit-top, 250px))}
+#cardsGrid .gridtable th{position:sticky;top:0;z-index:3;
+  box-shadow:inset 0 -1px 0 var(--line)}
+/* width:max-content, NOT 100%. With table-layout:fixed and width:100% the
+   table must always fill its container, so narrowing one column forced the
+   others wider to make up the difference -- which is exactly the behavior
+   that kept coming back. Sizing to the sum of the columns means dragging one
+   edge shrinks the table, like the Bank Feed grid. */
+/* No min-width:100%. With table-layout:fixed a minimum of the full container
+   width means shrinking one column must widen the others to make it up --
+   which is the "force adjusting" that kept coming back. */
+/* width:auto, NOT max-content.
+   With table-layout:fixed the used table width is the SUM of the column
+   widths -- that is the point of fixed layout, and it is what lets one column
+   grow without the others giving anything up. `max-content` is a CSS3 sizing
+   keyword resolved from the CONTENT, which is a different question: the
+   browser went on sizing the table from what was in the cells and quietly
+   undid every width the drag handle set. That is why the grips did nothing. */
+#auditGrid .gridtable{table-layout:fixed;width:auto;
+  border-collapse:separate;border-spacing:0}
+#auditGrid .gridtable th,#auditGrid .gridtable td{
+  border-bottom:1px solid var(--line)}
+/* THE TOOLBAR STICKS TOO. #auditGrid is the scroller and the quick search and
+   Filters button live inside it, so they scrolled away while the headings
+   stayed -- the wrong half to lose. The headings then sit BELOW the toolbar
+   rather than at 0, or the two overlap. */
+/* The toolbar scrolls away, exactly as it does on every other grid. Making it
+   sticky meant the header had to be offset by its height, and any offset --
+   typed or measured -- is one more thing that can be a few pixels out. Every
+   other screen here sticks the header at 0 and lets the toolbar go; matching
+   that removes the offset rather than getting it right. */
+#auditGrid .gridicons{margin:0;padding:8px 0}
+/* The header sticks BELOW the toolbar, which is itself sticky at 0. */
+#auditGrid .ahead{box-shadow:inset 0 -1px 0 var(--line)}
+#auditGrid .gridtable th{position:sticky;top:46px;z-index:3;
+  /* A background, which this rule never had: a transparent sticky header lets
+     the rows scroll up underneath and read through it. */
+  background:var(--card);box-shadow:inset 0 -1px 0 var(--line)}
+/* Same treatment for every settings grid: Algorithms, Rules & Tags and the
+   rest were the only tables whose headers still scrolled away. */
+#algoGrid .gridtable th,#tablesGrid .gridtable th,#tablesGrid .rulegrid th,
+#setupGrid .gridtable th{position:sticky;top:0;z-index:12;
+  background:var(--card);box-shadow:inset 0 -1px 0 var(--line)}
+/* The scroller the sticky header pins against -- same shape as #gridscroll on
+   the transaction grids. Applied to the table's own wrapper so a screen with
+   several tables keeps each one's header with its own rows. */
+.tablescroll{overflow:auto;scrollbar-gutter:stable;
+  max-height:calc(100vh - 250px);border-radius:8px}
+.tablescroll .gridtable{border:none}
+/* Same as the audit and rules grids: fixed layout with no width floor, so
+   narrowing one column narrows the table rather than widening its neighbors. */
+#cardsGrid .gridtable{max-width:none;width:max-content;table-layout:fixed}
+.gridtable td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The settings grids were a size smaller with heavier headings than the
+   transaction grids, so moving between them felt like two applications. */
+.gridtable{font-size:13px}
+
+/* ONE SIZE ACROSS THE ENGINE, matching the Bank Feed's rows. The other
+   grids were a size smaller, which made a team or a plan read as lesser
+   than a transaction -- and made the colored pills hard to read. */
+.gridtable td{font-size:14px;font-weight:400}
+/* The force-match table holds inputs; clipping them left a sliver the
+   cursor could not land in. */
+#fmList .gridtable td{overflow:visible}
+#fmList .gridtable td input{pointer-events:auto;position:relative;z-index:1}
+/* The same grip the feed uses. It was a transparent strip before, which is
+   invisible until you happen to land on it. */
+/* THE RIGHT EDGE OF A HEADER CELL IS THE RESIZE HANDLE.
+   There is no handle element any more -- see the comment on the drag handler
+   in app.js. A visible 1px rule marks it, drawn as the cell's own right
+   border so nothing is positioned, stacked or clipped. */
+.gwcol{position:relative;border-right:1px solid transparent}
+.gridtable tr:first-child .gwcol{border-right:1px solid var(--line)}
+.gwcol:hover{border-right-color:var(--accent)}
+/* While a drag is running, no text anywhere gets selected by the sweep. */
+body.gwdrag{user-select:none;cursor:col-resize}
+.gcol::before{content:"";width:2px;height:14px;background:var(--line);
+  border-radius:2px}
+.gcol:hover::before{background:var(--accent);width:3px;height:18px}
+.gridicons{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;row-gap:6px}
+/* Signals across the middle, then Gates and Strengths beside each other under
+   it -- the two are read together (what is allowed in, what it is then called)
+   and stacking them put a screen's height between them. */
+#tablesGrid .algo-mid{max-width:820px;margin:0 auto}
+.algo-cols{display:flex;gap:26px;align-items:flex-start;justify-content:center;
+  flex-wrap:wrap;max-width:1180px;margin:0 auto}
+/* Fixed shares rather than "grow to fit". Gates carries a description column
+   and Strengths does not, so left to themselves Gates took two thirds of the
+   width and its own table still overflowed. */
+.algo-col{flex:0 1 580px;min-width:0}
+.algo-col .gridtable{max-width:100%;width:100%;table-layout:auto}
+.algo-col .gridtable td:nth-child(2){font-size:12px;line-height:1.4}
+/* 17: each band tinted with the color that band wears in the grids, so the
+   setting and the badge it produces are recognizably the same thing. */
+tr.band-strong td:first-child{background:#e3f2ea;color:var(--ok);font-weight:600}
+tr.band-moderate td:first-child{background:#fdf2dc;color:var(--warn);font-weight:600}
+tr.band-weak td:first-child{background:#f2eaea;color:var(--bad);font-weight:600}
+.filters{padding:0 20px 12px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  position:sticky;top:var(--h-nav);z-index:31;background:var(--bg)}
+/* The grid must be able to grow when columns are widened, so the container
+   scrolls horizontally instead of clipping. */
+main{padding:0 0 60px;max-width:none}
+/* The grid scrolls inside its own box rather than with the page.
+   Styling the bar wasn't enough: it sat at the bottom of a container as tall as
+   all 200 rows, so it only came into view once you had scrolled to the last
+   one. Bounding the container to the viewport puts the bar at the bottom of the
+   screen, where it belongs, and it never leaves. */
+#gridscroll{padding-bottom:0;scrollbar-gutter:stable;
+  overflow:auto;max-height:calc(100vh - var(--grid-top) - 14px)}
+/* The column header stays put while the rows scroll under it. */
+/* The header sits ABOVE the icon bar, which scrolls under it. z-index alone
+   was not enough -- the bar had no stacking context of its own, so it painted
+   over the header as soon as the grid scrolled. */
+#gridscroll #colhead{position:sticky;top:0;z-index:15;background:var(--bg)}
+#auditGrid .ahead{background:var(--bg)}
+#gridicons,.gridicons{position:relative;z-index:1}
+#gridscroll::-webkit-scrollbar{height:12px;width:12px}
+#gridscroll::-webkit-scrollbar-track{background:var(--chip);border-radius:7px}
+#gridscroll::-webkit-scrollbar-thumb{background:#c4c3bd;border-radius:7px;
+  border:3px solid var(--chip)}
+#gridscroll::-webkit-scrollbar-thumb:hover{background:#a9a8a2}
+/* the whole grid scrolls as one, so headers stay aligned with the rows */
+
+/* Tighter than it was: at 44px a row plus its gap cost 51px, so a laptop saw
+   about eleven. This fits half as many again without crowding the text. */
+.row{background:var(--card);border:1px solid var(--line);border-radius:7px;
+margin-bottom:2px;overflow:hidden;min-width:min-content}
+.hd{display:flex;align-items:center;gap:10px;padding:3px 14px;cursor:pointer;
+min-width:min-content;min-height:26px;box-sizing:border-box}
+.hd:hover{background:#fafaf8}
+.src{font-size:11px;background:var(--chip);color:var(--tx2);padding:2px 7px;border-radius:5px;
+width:46px;text-align:center;flex:none}
+.amt{font-weight:600;width:96px;text-align:right;flex:none}
+:root{--w-status:120px;--w-bmemo:250px;--w-bclass:150px;--w-bno:120px;--w-bven:190px;--w-bdate:86px;--w-bamt:100px;--w-bbal:100px;--w-bqbo:130px;
+--w-status:150px;--w-card:120px;--w-ven:200px;--w-date:82px;--w-amt:96px;--w-prof:140px;--w-l4:112px;--w-memo:150px;--w-note:170px;
+--w-cven:170px;--w-ccat:190px;--w-act:140px;--w-kind:130px;--w-details:320px;
+--w-user:150px;--w-ts:150px;--w-qbo:130px;--w-scur:90px;--w-samt:120px;--w-ord:120px;
+--w-txnid:150px;--w-upts:160px;--w-ingest:120px;
+/* The audit log's columns, on the same variables as every other grid. The
+   grid itself used to be a <table> with its own resizer; it is now the same
+   flex rows the Bank Feed uses, so it inherits the drag handles, the sticky
+   header and the saved widths rather than reimplementing all three. */
+--w-a-ts:150px;--w-a-user:110px;--w-a-group:130px;--w-a-action:200px;
+--w-a-kind:120px;--w-a-card:140px;--w-a-date:95px;--w-a-vendor:170px;
+--w-a-category:220px;--w-a-bank:200px;--w-a-profile:150px;--w-a-amount:100px;
+--w-a-last4:112px;--w-a-detail:300px;--w-a-txn:130px;--w-a-qbo:130px;
+--w-a-bill:110px}
+
+/* One rule per audit column: fixed width from its variable, no growing, and
+   text that clips rather than wrapping -- a header that wraps is a header
+   whose height changes when you drag it, which is what the table version did. */
+.c-a-ts,.c-a-user,.c-a-group,.c-a-action,.c-a-kind,.c-a-card,.c-a-date,
+.c-a-vendor,.c-a-category,.c-a-bank,.c-a-profile,.c-a-amount,.c-a-last4,
+.c-a-detail,.c-a-txn,.c-a-qbo,.c-a-bill{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-a-ts{width:var(--w-a-ts);flex:0 0 var(--w-a-ts)}
+.c-a-user{width:var(--w-a-user);flex:0 0 var(--w-a-user)}
+.c-a-group{width:var(--w-a-group);flex:0 0 var(--w-a-group)}
+.c-a-action{width:var(--w-a-action);flex:0 0 var(--w-a-action)}
+.c-a-kind{width:var(--w-a-kind);flex:0 0 var(--w-a-kind)}
+.c-a-card{width:var(--w-a-card);flex:0 0 var(--w-a-card)}
+.c-a-date{width:var(--w-a-date);flex:0 0 var(--w-a-date)}
+.c-a-vendor{width:var(--w-a-vendor);flex:0 0 var(--w-a-vendor)}
+.c-a-category{width:var(--w-a-category);flex:0 0 var(--w-a-category)}
+.c-a-bank{width:var(--w-a-bank);flex:0 0 var(--w-a-bank)}
+.c-a-profile{width:var(--w-a-profile);flex:0 0 var(--w-a-profile)}
+.c-a-amount{width:var(--w-a-amount);flex:0 0 var(--w-a-amount)}
+.c-a-last4{width:var(--w-a-last4);flex:0 0 var(--w-a-last4)}
+.c-a-detail{width:var(--w-a-detail);flex:0 0 var(--w-a-detail)}
+.c-a-txn{width:var(--w-a-txn);flex:0 0 var(--w-a-txn);color:var(--tx2)}
+.c-a-qbo{width:var(--w-a-qbo);flex:0 0 var(--w-a-qbo);color:var(--tx2)}
+.c-a-bill{width:var(--w-a-bill);flex:0 0 var(--w-a-bill);color:var(--tx2)}
+
+/* The header and the rows: the same .hd flex row the Bank Feed uses. A fixed
+   height on the header, so dragging a column cannot change it. */
+/* THE SAME HEADER AS EVERY OTHER GRID. It was styled by hand here -- its own
+   background, its own color, its own weight -- so it looked like a different
+   product's table. It now takes .colhead's appearance and adds only what is
+   specific to this screen: a fixed height, and sticking below the toolbar
+   rather than at the top of the scroller. */
+/* Offset by the toolbar's MEASURED height, not a number typed here. The
+   toolbar wraps differently at different widths, so any constant is right at
+   one window size and wrong at the rest -- see the --audit-head-top the
+   renderer sets. */
+#auditGrid .ahead{position:sticky;top:0;z-index:15;
+  display:flex;align-items:center;gap:10px;padding:0 14px;height:34px;
+  width:max-content;min-width:100%;box-sizing:border-box}
+#auditGrid .arow{display:flex;align-items:center;gap:10px;padding:0 14px;
+  height:32px;width:max-content;min-width:100%;box-sizing:border-box;
+  border-bottom:1px solid var(--line);font-size:14px}
+#auditGrid .arow:hover{background:var(--bg)}
+#auditGrid .ahead > span{position:relative;display:block}
+/* One type treatment for every cell. Mixed sizes, grays and bold weights made
+   the grid read as though some columns mattered more than others, which isn't
+   true -- which column matters depends on the charge, not on the column. Only
+   width differs per column. */
+.hd .c-card,.hd .c-ven,.hd .c-date,.hd .c-amt,.hd .c-prof,.hd .c-l4,
+.hd .c-memo,.hd .c-note,.hd .c-cven,.hd .c-ccat,.hd .c-kind,.hd .c-details,.hd .c-ingest,.hd .c-act,
+.hd .c-user,.hd .c-ts,
+.row .b-no,.row .b-ven,.row .b-date,.row .b-amt,.row .b-bal,.row .b-memo,.row .b-class,.row .b-qbo{
+font-size:14px;font-weight:400;color:var(--tx)}
+.c-card{width:var(--w-card);flex:0 0 var(--w-card)}
+.c-ven{width:var(--w-ven)}
+.c-date{width:var(--w-date)}
+.c-amt{width:var(--w-amt)}
+.c-prof{width:var(--w-prof)}
+.c-l4{width:var(--w-l4)}
+.c-memo{width:var(--w-memo)}
+.c-note{width:var(--w-note)}
+/* A row, so a badge added after the picker sits BESIDE the value rather than
+   dropping to a second line and making every row in the grid taller. The
+   picker takes the space that is left; the badge takes only what it needs. */
+.c-cven,.c-ccat{display:flex;align-items:center;gap:0;min-width:0}
+.c-cven>.cellsel,.c-ccat>.cellsel,
+.c-cven>.cell-ro,.c-ccat>.cell-ro{flex:1;min-width:0}
+.c-cven>.tag,.c-ccat>.tag{flex:none}
+.c-cven{width:var(--w-cven)}
+.c-ccat{width:var(--w-ccat)}
+.c-act{width:var(--w-act);flex:0 0 var(--w-act);text-align:center;
+  display:flex;gap:6px;align-items:center;justify-content:center}
+/* In the HEADER the cell is just a label, so it must not become a flex row --
+   that would treat the resize handle as a sibling and lay it out inline. */
+#colhead .c-act{display:block}
+.act-btn{background:var(--accent);color:#fff;border:1px solid var(--accent);
+  border-radius:5px;padding:3px 12px;font-size:12px;cursor:pointer;flex:none}
+.act-btn.go{background:#15803d;border-color:#15803d}
+.act-btn:hover{filter:brightness(1.08)}
+.c-kind{width:var(--w-kind)}
+.c-details{width:var(--w-details)}
+.c-user{width:var(--w-user)}
+.c-ts{width:var(--w-ts)}
+.c-qbo{width:var(--w-qbo);font-variant-numeric:tabular-nums}
+/* Two words, two lines: the columns are narrow and "Source Currency" on one
+   line forced the whole header row wider than the data needed. */
+#colhead .c-scur,#colhead .c-samt{white-space:normal;line-height:1.15}
+.c-ord{width:var(--w-ord);font-variant-numeric:tabular-nums}
+/* Icon actions: a consistent square hit target, so four of them in a column
+   line up regardless of which shape is inside. */
+.act-ico{display:inline-flex;align-items:center;justify-content:center;
+  width:27px;height:25px;padding:0;margin-right:4px;border:1px solid transparent;
+  border-radius:6px;cursor:pointer;color:#fff;vertical-align:middle}
+.act-ico:hover{filter:brightness(1.08)}
+/* A ticked bill stays obvious once the list is scrolled past it. */
+tr.fmOn>td{background:#eaf5ec}
+tr.fmOn>td:first-child{box-shadow:inset 3px 0 0 #15803d}
+.colrow.colfixed{opacity:.55}
+.colrow.colfixed .collabel{color:var(--tx2)}
+.act-ico:active{filter:brightness(.94)}
+/* Filled, so the action reads at a glance and the four are told apart by
+   color as well as by shape. */
+.ico-add{background:#15803d;border-color:#15803d}
+.ico-off{background:#e9edf2;border-color:#e9edf2;color:#b3bcc7;cursor:default}
+.ico-match{background:var(--accent);border-color:var(--accent)}
+.ico-split{background:#d4a017;border-color:#b8860b}
+
+.ico-del{background:var(--bad);border-color:var(--bad)}
+.ico-undo{background:#0891b2;border-color:#0e7490}
+.ico-force{background:#475569;border-color:#334155}
+.b-act{width:86px;white-space:nowrap}
+.c-upts{width:var(--w-upts);flex:0 0 var(--w-upts);white-space:nowrap}
+.c-txnid{width:var(--w-txnid);flex:0 0 var(--w-txnid);
+  font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-scur{width:var(--w-scur)}
+.c-samt{width:var(--w-samt);text-align:left;font-variant-numeric:tabular-nums}
+.b-no{width:var(--w-bno)} .b-ven{width:var(--w-bven)}
+.b-date{width:var(--w-bdate)}
+.b-amt{width:var(--w-bamt)}
+.b-bal{width:var(--w-bbal)}
+.b-qbo{width:var(--w-bqbo);font-variant-numeric:tabular-nums}
+.b-memo{width:var(--w-bmemo)}
+.b-class{width:var(--w-bclass);flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.b-age{width:110px;flex:0 0 110px}
+.b-no,.b-ven,.b-date,.b-amt,.b-bal,.b-memo,.b-qbo{text-align:left}
+.bhead>span{text-align:left;position:relative}
+.b-no,.b-ven,.b-date,.b-amt,.b-bal,.b-memo,
+.c-card,.c-ven,.c-date,.c-amt,.c-prof,.c-l4,.c-memo,.c-note,.c-status,.c-cven,.c-ccat,.c-kind,.c-ingest,
+.c-details,.c-user,.c-ts,.c-ord,.c-scur,.c-samt,.c-txnid,.c-qbo,.b-qbo{
+flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+/* Action is centerd over its buttons, in the header as well as the rows. Listed
+   apart from the block above because that block ends in text-align:left, and it
+   comes after every rule that tries to center this column. */
+.c-act{flex:0 0 var(--w-act);overflow:hidden;white-space:nowrap;text-align:center}
+#colhead .c-act{display:block;text-align:center}
+/* Two-word headers fold rather than clip when the column is narrowed. Stated
+   here, after the shared cell rule above, because that one ends in
+   white-space:nowrap and would otherwise win. */
+#colhead .c-status,#colhead .c-details,#colhead .c-card,#colhead .c-act{
+  white-space:normal;line-height:1.15}
+/* Every header cell anchors its own resize handle. This used to come from
+   .sortcol, which meant a column with nothing to sort by -- Action -- had no
+   positioning context, so its handle flew off to the page corner and there was
+   no way to drag that column's width. */
+/* Left, and with the SAME horizontal inset as the cell contents below, so a
+   heading sits over its own column rather than a few pixels off it. */
+#colhead>span,.bhead>span,#auditGrid .ahead>span{text-align:left;
+  position:relative;padding-left:5px}
+.sortcol{cursor:pointer;user-select:none}
+/* A visible divider between headers, wide enough to grab easily. It was a
+   transparent 10px strip before, which nobody could find. */
+.rz{position:absolute;top:-7px;right:-8px;width:16px;height:28px;cursor:col-resize;
+display:flex;align-items:center;justify-content:center}
+.rz::before{content:"";width:2px;height:16px;background:var(--line);border-radius:2px}
+.rz:hover::before,.rz.dragging::before{background:var(--accent);width:3px;height:22px}
+/* Hidden by default and shown by class, never by inline display. Setting
+   display inline meant any path that cleared it left the element as a plain
+   block: the column spans lost their row and painted as one run of capitals,
+   which is what the flash between tabs was. */
+/* The audit grid's header joins these selectors rather than restating them.
+   Restated, it drifted: its own background, color and weight made it look
+   like a table from a different product. */
+#colhead{padding-bottom:8px;border-bottom:1px solid var(--line);
+  min-width:min-content}
+/* NOT padding-bottom here. The audit header has a fixed height so that
+   dragging a column cannot change it, and adding 8px of padding on top of that
+   made it 42px tall while it was still being offset by a hard-coded 46 -- the
+   4px gap is the sliver of row you could see above the headings. */
+#auditGrid .ahead{border-bottom:1px solid var(--line);min-width:min-content}
+#colhead{display:none}
+#colhead.on{display:flex;align-items:center;gap:10px}
+/* Fixed regardless of contents: a "matched to bill 94693534" badge is far
+   wider than "strong 88%", and letting it size the column made rows in
+   Categorized both taller and longer than rows in For Review. */
+/* The contested hand sits in a gutter to the LEFT of where the sub-row content
+   normally begins -- under the last action icon -- so the percentage pill lines
+   up with the Card Account column above it.
+
+   Two rules together do that, and both are needed:
+   the flag reserves a fixed width whether or not a hand is present, so the
+   pill cannot shift sideways between two otherwise identical rows; and the
+   bill row is pulled left by exactly that width, so the pill lands where the
+   content used to start rather than one gutter further right. Previously only
+   the first rule existed, which is why the hand appeared beside the pill
+   instead of beneath the hammer. */
+:root{--tm-flag-w:26px}
+/* A retired row is READ-ONLY, not merely dim.
+   Fading it while leaving the type dropdown and Connect live meant the row
+   looked unavailable and still accepted edits -- the worst of both. The fade
+   is on the cells; the controls are actually disabled; and Restore is exempt,
+   because a dimmed way out of a state is the one control that must not look
+   unavailable. */
+/* Muted TEXT, not a faded cell.
+   `opacity` on the td composites the whole subtree, so the Restore button
+   inside it could never be brighter than its parent however it was styled --
+   which is why exempting it did nothing. Color is inherited per element, so
+   the row reads as retired and the one control that gets you out of that state
+   keeps its full weight. */
+tr.retired > td{color:var(--tx2)}
+tr.retired select,tr.retired input,tr.retired .plaidLink,
+tr.retired .cardName,tr.retired .qrefEdit{
+  pointer-events:none;opacity:.45}
+tr.retired .cardRetire,tr.retired .qrefActive{pointer-events:auto}
+.tm-flag{display:inline-block;width:var(--tm-flag-w);flex:0 0 var(--tm-flag-w);
+  text-align:left;line-height:1}
+/* Both sub-rows start at the SAME x, and the hand sits in the gutter to the
+   left of that -- under the last action icon. Previously only the bill row was
+   pulled left, so its pill and the HAL pill above it began at different
+   places, and widening the gutter moved the hand without fixing the mismatch.
+   Pulling both by the same amount keeps them aligned with each other. */
+/* The hand is taken OUT of the layout entirely.
+   Shifting rows by a margin kept moving one relative to the other, because the
+   flag still occupied width in the flex row. Positioned absolutely it occupies
+   none, so the bill row and the HAL row begin at exactly the same x -- the
+   pills line up because nothing is pushing one of them along. */
+.tm-bill{position:relative}
+.tm-bill>.tm-flag{position:absolute;left:calc(-1 * var(--tm-flag-w));
+  top:50%;transform:translateY(-50%);width:var(--tm-flag-w);margin:0}
+/* Wraps onto a second line rather than being cut off, the same as the memo and
+   detail columns: narrowed to a thumbnail, "Program API" should fold, not
+   vanish behind an ellipsis. */
+/* The QBO Sync sub-navigation. Its own class, deliberately: every generic row
+   class on this screen is suppressed by the cards-open rules above. */
+.qsnav{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:0 0 12px}
+/* The HEADER wraps too.
+   Scoped to `.hd .c-ingest` this never applied: the header row is #colhead, a
+   sibling of the rows, not a .hd inside one. Narrowed, "Ingestion Method" and
+   "Ingestion Time Stamp" were cut mid-word while the cells beneath them
+   wrapped politely. */
+#colhead .c-ingest,#colhead .c-upts,#colhead .c-txnid,
+.hd .c-ingest,.hd .c-upts{white-space:normal !important;line-height:1.15;
+  overflow-wrap:anywhere;height:auto}
+.c-ingest{width:var(--w-ingest);flex:0 0 var(--w-ingest);overflow:hidden;
+  white-space:normal;overflow-wrap:anywhere;line-height:1.25;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.c-status{width:var(--w-status);flex:0 0 var(--w-status);overflow:hidden}
+#colhead .c-status{position:relative}
+/* The CELL is fixed to the column width; the PILL inside it is sized to its
+   own text. Widening the column no longer stretches the badge into a lozenge. */
+.hd .c-status{display:flex;align-items:center}
+.hd .tier{width:auto;flex:0 1 auto;max-width:100%;text-align:center;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box}
+/* The grid ends where the last column ends -- no trailing dead space. */
+#gridscroll .row,#gridscroll #colhead{width:max-content;min-width:0}
+/* The bills header sizes to its columns like the charge header does, so the
+   export icon sits at the edge of the GRID rather than the edge of the page. */
+.bhead{width:max-content;min-width:0;position:sticky;top:0;z-index:15;
+  background:var(--bg)}
+.hd{width:max-content}
+.meta{font-size:12px;color:var(--tx2);white-space:nowrap;width:250px;flex:none;
+overflow:hidden;text-overflow:ellipsis}
+/* The top-ranked bill, shown without expanding: most rows are decided by it,
+   and opening every row to see one line is the wrong default. */
+/* Same height as a transaction row. It sat at 6px/8px padding and wrapped,
+   which made the row it belongs to taller than every other row. */
+/* The pill is fixed width so what follows starts at the same x on every row --
+   a 6% and a 100% are different widths, and the HAL line and the bill line
+   never lined up because of it. The left inset puts both under the Profile
+   column rather than at the very edge. */
+/* Indented to wherever the Profile column starts. Measured rather than
+   calculated: the columns can be reordered and resized, so any fixed sum would
+   be right until somebody moved one. --hal-indent is set after each render. */
+/* Both detail lines start where the CARD ACCOUNT column does, and stack -- the
+   HAL account above the bill. Side by side, each was measured to a different
+   column and the eye had two left edges to track on one row; and when the bill
+   text ran long the two fought for the same width. --card-indent is measured
+   after each render, because the columns can be reordered and resized. */
+.topmatch{position:relative;display:flex;flex-direction:column;
+  align-items:flex-start;gap:2px;
+  padding:2px 14px 3px var(--card-indent, 34px);
+  border-top:1px dashed var(--line);font-size:12px;
+  min-height:24px;box-sizing:border-box}
+.tm-bill,.tm-hal{display:flex;align-items:center;gap:10px;min-width:0;
+  max-width:100%}
+/* HAL first in the source, so it sits on top without needing an order rule. */
+/* Airtable-style value pills, so Full/Partial and a season status read the same
+   way here as in the base they came from. */
+.pill{display:inline-block;padding:1px 9px;border-radius:10px;font-size:13px;
+  font-weight:600;line-height:19px;white-space:nowrap;vertical-align:middle}
+.pill-none{background:#fee2e2;color:#991b1b}
+
+/* The HAL line is read, not skimmed past -- gray made it look like a footnote. */
+/* Everything after the account name reads like the bill line beneath it --
+   same size, same weight, same color. It was a size smaller and gray, which
+   made the plan and the statuses look like a footnote. */
+/* THE WHOLE LINE, including the team and address it starts with. Those were
+   left behind at the smaller size when the rest moved up, so the line began
+   small and grew halfway along. */
+.tm-hal .pill-amt,.tie-txt,.tm-hal .pill,.tm-hal .tie-mark{
+  color:var(--tx);font-size:14px;font-weight:400}
+.tm-hal .pill{font-weight:600}
+/* The tick belongs to what FOLLOWS it, so the gap goes before it. Without this
+   it sat hard against the status pill it has nothing to do with. */
+.tm-hal .tie-mark{margin-left:14px}
+.pill-amt{font-size:12px;color:var(--tx2);white-space:nowrap;
+  vertical-align:middle;margin-left:2px}
+/* The pill is fixed width so the bill text starts at the same x on every row. */
+.topmatch .tier{min-width:44px;text-align:center;flex:none}
+/* The bill takes only the width it needs, so the "see all matching bills" link
+   follows straight after it rather than being pushed to the far edge. */
+/* THE WHOLE LINE AT 14px, the transaction's size. This rule was the one
+   actually sizing these lines -- at 13px -- and the earlier fix targeted
+   classes the lines do not use, so nothing changed on screen. */
+.topmatch .tm-b{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;font-size:14px}
+/* The badges on the line too -- STH, and the match percentage -- which were
+   11px beside 14px text. */
+.topmatch .tier{font-size:14px;padding:1px 9px;line-height:1.5}
+/* Bold where the markup asks for it: the account name and "Bill 72451615".
+   Stated, because an earlier rule here forced every span to normal weight. */
+.topmatch .tm-b b{font-weight:600}
+.topmatch .tm-more{flex:none;margin-left:10px;font-size:13px;
+  font-weight:600;
+  color:var(--accent);background:none;border:none;cursor:pointer;padding:0;
+  font-family:inherit}
+.topmatch .tm-more:hover{text-decoration:underline}
+/* A spinner exactly the size of the Excel glyph it stands in for. The export
+   buttons are sized (line-height:0) for a 17px icon, so swapping in a word broke
+   their geometry; a same-size element does not. */
+@keyframes gi-spin{to{transform:rotate(360deg)}}
+.gi-spin{display:inline-block;width:17px;height:17px;box-sizing:border-box;
+  border:2px solid var(--line);border-top-color:#15803d;border-radius:50%;
+  animation:gi-spin .7s linear infinite}
+
+/* The page-center spinner, for waits that block: fetching a Plaid link token
+   and loading Plaid's script before their overlay appears.
+   Bigger and in the app's blue -- the only other spinner here is 17px and
+   green because it stands in for the Excel glyph, which is the wrong size and
+   the wrong color for something in the middle of the screen. */
+.bigspin{position:fixed;inset:0;z-index:9000;display:flex;
+  align-items:center;justify-content:center;background:rgba(247,247,245,.55)}
+/* The whole ring is blue -- a pale blue track with a solid blue head, not a
+   gray track. At a glance a gray ring with one colored segment reads as a
+   gray spinner, which is what it looked like once Plaid's own took over. */
+.bigspin::after{content:"";width:84px;height:84px;box-sizing:border-box;
+  border:7px solid rgba(45,106,143,.25);border-top-color:var(--accent);
+  border-radius:50%;animation:gi-spin .8s linear infinite}
+/* Above Plaid's overlay while it loads, so the two never show at once. */
+.bigspin{z-index:2147483000}
+.tag{font-size:11px;padding:1px 8px;border-radius:20px;margin-left:6px;
+  font-weight:600;letter-spacing:.02em;line-height:17px}
+.tag-pay{background:#e3f2ea;color:var(--ok)}
+.tag-ref{background:#fbe9e9;color:var(--bad)}
+/* Green, and only present while the value is still the rule's answer. */
+/* Inside the picker rather than beside it, pushed to the right-hand end --
+   outside, it ate width the value needed and pushed the chevron off. */
+.tag-rule{background:#dbeafe;color:#1e40af;flex:none;margin-left:auto;
+  margin-right:4px;letter-spacing:.03em}
+/* Amber, not red: a contested bill is a thing to look at, not an error. */
+/* A single character, so it costs the column almost nothing. */
+.tag-bang{background:var(--bad);color:#fff;margin-left:6px;font-weight:700;
+  display:inline-block;font-size:10px;padding:0 5px;border-radius:9px;
+  cursor:help}
+.tag-vs{background:#fdf2dc;color:var(--warn);margin-left:6px;
+  display:inline-block;vertical-align:baseline;font-size:10px;padding:0 5px;
+  cursor:help}
+/* The emoji stands alone -- a colored pill behind a colored glyph read as
+   two badges stacked. Sized to match the strength pill beside it. */
+.tag-vs.beaten{background:none;padding:0;line-height:0;display:inline-flex;
+  align-items:center;vertical-align:middle}
+.tag-split{background:#e8eefc;color:var(--accent);margin-left:6px;
+  /* Inline with the category rather than under it: on its own line it made
+     every row in the grid taller for the sake of two words on a few of them. */
+  display:inline-block;vertical-align:middle;padding:1px 8px}
+.splitMode,.bsMode{font-size:12px;padding:4px 12px}
+.bsMode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.splitMode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* A program that issues a number per purchase, flagged on the Card Accounts
+   grid. Shown here because it changes what a CC Last 4 identifies. */
+.vtag{font-size:9px;background:#ede9fb;color:#5b3fb5;padding:1px 5px;
+  border-radius:20px;margin-left:5px;font-weight:600;letter-spacing:.03em}
+/* Drawn, not an emoji: Windows has no flag glyphs and renders 🇨🇦 as the bare
+   letters "CA", which is what was showing. */
+
+.tier{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;
+width:auto;display:inline-block;white-space:nowrap;text-align:center;flex:none}
+.t-strong{background:#e3f2ea;color:var(--ok)} .t-moderate{background:#fdf2dc;color:var(--warn)}
+.t-weak{background:#f2eaea;color:var(--bad)} .t-none{background:var(--chip);color:var(--tx2)}
+.body{display:none;border-top:1px solid var(--line);padding:11px 14px;background:#fcfcfa}
+/* Shaded and inset, so an opened row reads as part of the row above it rather
+   than as more transactions. */
+.row.open .body{display:block;background:#f2f4f6;padding:5px 8px;
+  border-top:1px solid var(--line);
+  box-shadow:inset 3px 0 0 var(--accent)}
+.row.open{border-color:var(--accent)}
+.row.open .cand{background:var(--card)}
+/* Sized to match a transaction row -- 26px tall, 2px apart. An expansion that
+   is taller than the rows around it reads as a different kind of thing.
+   Width is capped so the Match button sits next to the text it belongs to
+   rather than out at the far edge of a very wide grid, and every candidate is
+   the same width so the buttons line up. */
+/* One width for every candidate, so the rows read as a list rather than a
+   ragged stack. The match icon hangs to the LEFT of that box, which puts each
+   strength pill on the same x as the pill on the top-bill line above. */
+.cand{display:flex;gap:10px;align-items:center;padding:3px 9px;
+  border:1px solid var(--line);border-radius:7px;margin-bottom:3px;
+  background:var(--card);min-height:26px;box-sizing:border-box;
+  width:100%}
+.cand .d{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.candrow{display:flex;align-items:center;gap:6px}
+/* The icon hangs left of the box, so the pill inside it starts exactly where
+   the pill on the collapsed line above does. */
+.candrow .act-ico{margin-left:-33px;margin-right:0;flex:none}
+/* Bounded, or a wide grid stretches every bill line to the far edge and the
+   text floats alone in the middle of it. */
+.candrow .cand{max-width:980px}
+/* Indented to the CARD ACCOUNT column, the same anchor the top-bill line uses,
+   minus the padding .row.open .body already adds -- so an expanded bill sits
+   directly under the bill shown on the collapsed row instead of at the far
+   left. The 33px puts the match icon in the margin, which lines each strength
+   pill up with the pill above it. */
+.candlist{display:flex;flex-direction:column;align-items:stretch;
+  padding-left:calc(var(--card-indent, 34px) - 17px)}
+/* Border width stays 1px: a 2px border on the best match made that one row
+   taller than its neighbors, which is the unevenness this is fixing. */
+.cand.best{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sc{font-weight:600;min-width:50px;flex:none;line-height:1}
+/* One line, clipped rather than wrapped -- the bill number and amount are at
+   the start, which is what the eye is scanning for. */
+.cand .d{flex:1;min-width:0;font-size:13.5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.memo{font-size:12px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.why{font-size:12px;color:var(--tx2);margin-top:3px}
+.act{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.act button{border:1px solid var(--accent);background:var(--accent);color:#fff;
+border-radius:6px;padding:5px 12px;font-size:12px}
+.act .pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.act button.doUndo,.act button.doExclude{background:var(--tx2);border-color:var(--tx2)}
+.cand button{border:1px solid var(--accent);background:var(--accent);color:#fff;
+  border-radius:6px;padding:2px 12px;font-size:12px;flex:none}
+.code{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.empty{padding:34px;text-align:center;color:var(--tx2)}
+/* Wide enough for a full account path. At 320px
+   "Prepaid Inventory:NHL:San Jose Sharks (DEP)" was cut off around the league,
+   which is the part that distinguishes one team's account from another's.
+   Capped against the viewport so it cannot run off a narrow window. */
+#cellpick{position:fixed;z-index:70;width:min(680px,94vw);background:var(--card);
+  border:1px solid var(--line);border-radius:9px;padding:8px;
+  box-shadow:0 10px 30px rgba(0,0,0,.16)}
+#cellpickSearch{width:100%;font-size:13px;padding:5px 7px;margin-bottom:6px}
+#cellpickList{max-height:240px;overflow:auto}
+.typepick{padding:5px 8px;font-size:13px;border-radius:5px;cursor:pointer;
+  white-space:normal;overflow-wrap:anywhere}
+.typepick:hover{background:var(--chip)}
+.typepick.on{font-weight:600;color:var(--accent)}
+.cp-o.on{background:#e3f2ea;font-weight:600}
+.cp-o{padding:5px 7px;font-size:13px;border-radius:5px;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp-o:hover{background:var(--chip)}
+.cp-o.on{font-weight:600;color:var(--accent)}
+.cp-empty{padding:8px 7px;font-size:12px;color:var(--tx2)}
+/* Matches the inset of .cellsel's button so an uneditable cell lines up with
+   an editable one in the same column. */
+.cell-ro{display:block;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.cellsel,.cellsel-static{display:flex;align-items:center;gap:4px;width:100%;background:none;
+  border:1px solid transparent;border-radius:5px;padding:0 4px;cursor:pointer;
+  font:inherit;color:inherit;text-align:left}
+.cellsel:hover,.cellsel-static:hover{border-color:var(--line);background:#fafaf8}
+.cellsel .cs-v,.cellsel-static .cs-v{flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center}
+.cellsel .cs-c,.cellsel-static .cs-c{color:var(--tx2);font-size:10px;flex:none}
+/* Fixed width so the icons don't shift as columns are resized, and they never
+   scroll away with the rest of the header. */
+#gridicons{display:flex;gap:6px;align-items:center}
+/* No box: it's a disclosure control, not an action, and a bordered button
+   alongside the real filters read as one of them. */
+#hideBands{background:none;border:none;padding:0 2px;cursor:pointer;
+  color:var(--tx2);line-height:0;transition:transform .15s}
+#hideBands:hover{color:var(--accent)}
+/* Checkbox menus, shared by every multi-select filter. */
+/* Room for a full account name plus its badges. At the old width an account
+   with API and VIRTUAL badges wrapped onto two lines, which is what made the
+   list hard to scan. */
+.msmenu{min-width:340px;max-width:min(560px,92vw);
+  display:none;position:absolute;z-index:60;top:34px;left:0;
+  background:var(--card);border:1px solid var(--line);border-radius:8px;
+  padding:8px;min-width:210px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+/* Tighter. These lists are six to twelve short labels; at the old spacing a
+   picker needed scrolling to show choices that fit in half the space. */
+.msopt{display:flex;align-items:center;gap:7px;padding:2px 4px;font-size:12.5px;
+  line-height:1.3;
+  cursor:pointer;border-radius:5px}
+.msopt:hover{background:var(--chip)}
+.msopt input{width:auto;flex:none}
+.msact{display:flex;gap:6px;margin-top:7px;border-top:1px solid var(--line);
+  padding-top:7px}
+/* The whole row is the drag target, so the whole row shows the grab hand --
+   only the checkbox opts out. Scoping it to an inner strip meant hunting for
+   the few pixels that would grab. */
+.colrow{display:flex;align-items:center;gap:9px;padding:6px 4px;
+  border-bottom:1px solid var(--line);background:var(--card);cursor:grab}
+.colrow:active,.colrow.dragging{cursor:grabbing}
+.colrow.dragging{opacity:.45}
+
+/* The drop marker is a shadow, NOT a border.
+   A 2px border changes the row's height, which nudged every row below it while
+   the pointer was over one -- so the row under the cursor kept changing and
+   dragover/dragleave fought each other. That thrash is what made the cursor
+   flicker and vanish. A shadow paints inside the existing box, so nothing
+   moves. */
+.colrow.over{box-shadow:inset 0 3px 0 -1px var(--accent)}
+
+.colhandle{flex:1;display:flex;align-items:center;gap:9px;min-width:0;
+  padding:2px 0;cursor:inherit}
+.colhandle *{cursor:inherit}
+/* Nothing in the dialog may inherit an undefined cursor, and while a drag is
+   running the closed hand applies everywhere. */
+#cols,#cols *{cursor:default}
+#cols .colrow,#cols .colrow *{cursor:grab}
+#cols .colvis{cursor:pointer}
+body.col-dragging,body.col-dragging *{cursor:grabbing !important}
+.colgrip{color:var(--tx2);user-select:none;font-size:15px;flex:none}
+.collabel{font-size:13px;user-select:none;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.colvis{width:auto;flex:none;cursor:pointer}
+#flash{position:fixed;left:50%;top:74px;transform:translate(-50%,-8px);
+  background:#15803d;color:#fff;font-size:13px;font-weight:600;
+  padding:8px 20px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.16);
+  opacity:0;pointer-events:none;z-index:60;transition:opacity .18s,transform .18s}
+#flash.on{opacity:1;transform:translate(-50%,0)}
+.note{font-size:12px;color:var(--tx2);padding:0 20px 10px}
+.banner{background:#fdf2dc;color:var(--warn);border:1px solid #f0dcae;border-radius:8px;
+padding:9px 12px;margin:0 20px 12px;font-size:13px;max-width:1180px}
+/* Centerd, and floating above a dimmed page -- browsers anchor a <dialog> to
+   the top by default, which is what made the native confirm() look like a
+   browser chrome popup rather than part of the app. */
+/* Every button gives way under the pointer. The transform is small and the
+   transition shorter than a deliberate click, so it reads as the control
+   moving rather than as an animation playing.
+
+   `transform` rather than a margin or padding shift on purpose: it is composited
+   and changes no layout, so a button pressed inside a table or a sticky header
+   cannot nudge its neighbors or trigger a reflow.
+
+   Two exclusions, each for a reason:
+   * `:not(:disabled)` -- a button that cannot be pressed must not appear to
+     respond to being pressed. There are around sixty disabled states in here.
+   * `.btnpush` is kept as an alias so nothing that named it explicitly breaks;
+     it now adds nothing the global rule does not already give. */
+button{transition:transform .06s ease,box-shadow .06s ease}
+button:not(:disabled):active,.btnpush:not(:disabled):active{
+  transform:translateY(1px) scale(.97);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.25)}
+/* Restored for anything disabled: no movement, and no lingering transition
+   from a state it was in before being disabled. */
+button:disabled:active{transform:none;box-shadow:none}
+
+/* Roomier. At 420px a two-line message sat in a box barely larger than the
+   OK button, which reads as an afterthought rather than something to read. */
+dialog{border:1px solid var(--line);border-radius:12px;padding:24px 26px;
+  min-width:340px;max-width:520px;
+       margin:auto;box-shadow:0 12px 40px rgba(0,0,0,.18)}
+dialog::backdrop{background:rgba(15,23,42,.35)}
+dialog h3{margin:0 0 12px;font-size:15px;text-align:center}
+dialog label{display:block;font-size:12px;color:var(--tx2);margin:9px 0 3px}
+dialog select,dialog input{width:100%}
+.dact{display:flex;gap:8px;justify-content:center;margin-top:16px}   /* every window's buttons centered */
+
+
+/* THE FILTERS DIALOG.
+   Wider than the ordinary dialogs -- it holds seventeen fields rather than a
+   question -- and its own width rather than an inline style, so the rule sits
+   with every other dialog rule instead of in the markup. */
+#billfilters{max-width:560px;width:min(560px,94vw);padding:16px 18px 14px}
+#advfilters{max-width:560px;width:min(560px,94vw);padding:16px 18px 14px}
+#billfilters #billFilterRows,#advfilters #advFilterRows{display:flex;flex-direction:column;gap:11px;
+  padding:6px 2px 12px;flex:1;min-height:0;overflow:visible}
+/* A row with ONE field shows it at half width, centerd -- not stretched across
+   the dialog. Which fields appear depends on the tab (User only on
+   Categorized, Ingestion Method alone on Excluded), so a lone field is normal
+   rather than a special case, and a full-width box beside a column of
+   half-width ones reads as a mistake.
+   flex:1 shares the row evenly whatever the count -- two at half, four at a
+   quarter -- and max-width caps the single case without affecting the rest.
+   LEFT aligned, so a lone field starts on the same edge as every field above
+   it rather than floating in the middle of the dialog. */
+/* #auditfilters was missing from these selectors, which is the whole reason
+   its pairings came out one per line: .frow is not a global class, it is
+   styled per dialog, and a row with no flex on it stacks its children. */
+#billfilters .frow,#advfilters .frow,#auditfilters .frow{display:flex;gap:12px;
+  align-items:flex-end;width:100%;justify-content:flex-start}
+#billfilters .frow > div,#advfilters .frow > div,
+#auditfilters .frow > div{flex:1 1 0;min-width:0;max-width:calc(50% - 6px)}
+
+/* The vendor and category pickers are BUTTONS that look like text. Given the
+   same box as the inputs beside them they read as fields rather than as
+   captions floating in the row -- which is what "any vendor" looked like. */
+#advfilters .cellsel,#advfilters .cellsel-static{
+  border:1px solid var(--line);border-radius:7px;background:var(--card);
+  padding:6px 9px;min-height:34px;font-size:13px}
+#advfilters .cellsel:hover{border-color:var(--accent)}
+
+/* The multi-select menus open INSIDE a dialog, which clips and stacks its own
+   content. Anchored to the field and given a real surface, they stop
+   half-overlapping the rows beneath them. */
+#billfilters .msmenu,#advfilters .msmenu,#auditfilters .msmenu{
+  position:absolute;top:calc(100% + 4px);
+  left:0;width:100%;z-index:5;background:var(--card);
+  border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 10px 28px rgba(0,0,0,.16);
+  /* Shorter inside a dialog, where the space above and below is the dialog's
+     rather than the screen's: 250px was most of the box, so opening a picker
+     hid everything else in it. */
+  max-height:min(250px,34vh);overflow:auto;padding:4px}
+/* The action row keeps its place whatever the rows above are doing. */
+#advfilters .dact,#billfilters .dact,#auditfilters .dact{flex:0 0 auto}
+/* Rows as tight as the card picker's. The dialog inherited a roomier default,
+   which turned a six-option list into something that needed scrolling. */
+#billfilters .msmenu .msopt,#advfilters .msmenu .msopt,
+#auditfilters .msmenu .msopt{padding:2px 4px;
+  gap:7px;line-height:1.25}
+#advfilters #advFilterRows > div{width:100%}
+/* Centerd content, and the same width for every control so the two columns
+   line up down the dialog rather than each row finding its own shape. */
+#billfilters h3,#advfilters h3,#auditfilters h3{text-align:center}
+/* FIELD labels only -- the direct child of a cell.
+   Written as a blanket `label` rule it also hit the checkbox rows inside the
+   multi-select menus, which are labels too: they became block-level, muted and
+   tiny, so each checkbox sat above its own text in a narrow column. Restyling
+   the menus to compensate made it worse; scoping the rule is the fix. */
+#billfilters .frow > div > label,#advfilters .frow > div > label,
+#auditfilters .frow > div > label{display:block;text-align:left;
+  font-size:11px;color:var(--tx2);margin:0 0 3px}
+
+/* Full width for the FIELDS, not for the checkboxes inside a menu -- those are
+   inputs too, and stretching them is what made the tick boxes span the row. */
+#advfilters .frow > div > input,#billfilters .frow > div > input,
+#advfilters .frow > div > select,#billfilters .frow > div > select,
+#advfilters .frow > div > .msbtn,#billfilters .frow > div > .msbtn,
+#auditfilters .frow > div > .msbtn,
+#auditfilters .frow > div > input,
+#auditfilters .frow > div > select{width:100% !important;box-sizing:border-box}
+#advfilters .msmenu input[type=checkbox],
+#billfilters .msmenu input[type=checkbox],
+#auditfilters .msmenu input[type=checkbox]{width:auto !important}
+/* The multi-selects drop their menus inside a scrolling list, so they need a
+   stacking context that does not clip them. */
+/* #auditfilters was missing from every one of these selectors, which is why
+   its menus looked nothing like the others: they are scoped per dialog, and
+   a dialog not named in them gets the bare defaults. */
+#billfilters .ms,#advfilters .ms,#auditfilters .ms{position:relative}
+/* The field div IS the .ms in these dialogs, so the button is a direct
+   child of it and the width rules above reach it. The audit dialog had an
+   extra <div class="ms"> inside the field div, which put the button one
+   level too deep for every one of those selectors -- so it fell back to
+   the browser's default button and sized itself to its own text. */
+#billfilters .msmenu,#advfilters .msmenu,#auditfilters .msmenu{width:100%}
+
+
+/* THE API PANELS, right-aligned with the grid below them.
+   Each panel is width:max-content because they hold different amounts, so the
+   stack is what lines up rather than the individual boxes. `align-items` on a
+   column flex puts every panel's RIGHT edge on the same line as the last one,
+   which is the edge the grid shares. */
+/* LEFT aligned, all starting at the same edge as the grid below.
+   Right-aligning them pushed each panel to the far side of a full-width
+   container -- so they scattered across the top of the page and left the grid
+   stranded below a block of empty space. They line up with each other and with
+   the grid, which is what "lined up" needed to mean. */
+/* GRID LEFT, PANELS RIGHT, both starting at the top.
+   Stacked vertically the panels pushed the grid down the page and left a band
+   of empty space beside them. Side by side, each column starts at the top and
+   the panels line up with each other on their own left edge. */
+.cardsCols{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.cardsMain{flex:0 1 auto;min-width:0}
+/* Level with the top of the grid. The left column opens with its heading row
+   ("Bank / Card Accounts  10 mirrored  Sync from QBO"), so the panels start
+   below that same line rather than at the very top of the screen. */
+/* Level with the grid's HEADER ROW.
+   The left column opens with a title line and a toolbar above the table, so
+   matching the title alone still left the panels sitting high. */
+/* Narrower. The panels hold a line of text each, not a table -- stretched to
+   the full remaining width they read as empty boxes with a sentence in them. */
+/* Wide enough that a connection row fits on ONE line -- key, account, last
+   checked, date box, Pull now. At 620px the buttons wrapped under the date
+   field, which made two accounts look like four rows of unrelated controls. */
+/* Wide enough for the longest connection line. A Slash row carries an entity
+   name, a program name, a card account and a timestamp before the controls
+   even start -- at 780px that ran past the panel's edge. */
+.cardsSide{flex:0 1 900px;min-width:460px;padding-top:92px}
+.apiPanels{display:flex;flex-direction:column;align-items:stretch;
+  gap:0;padding:0 20px 0 0;max-width:100%}
+.apiPanels > div{width:100% !important;max-width:none}
+
+
+/* One line per connection.
+   These rows were free to wrap, and they did: the date box took the width and
+   pushed Pull now onto a line of its own, directly above the next account's
+   key. Which button belonged to which account stopped being obvious. */
+.apiPanels > div{white-space:normal}
+.apiPanels .apiRow{display:flex;align-items:center;gap:8px;font-size:12px;
+  margin-top:4px;flex-wrap:nowrap;white-space:nowrap;max-width:100%}
+/* The long text yields before the controls do: a name can be truncated and
+   still be recognizable, whereas a Pull now button pushed off the edge cannot
+   be clicked at all. */
+.apiPanels .apiRow > span:first-of-type{overflow:hidden;text-overflow:ellipsis;
+  min-width:0;flex:0 1 auto}
+.apiPanels .apiRow > *{flex:none}
+.apiPanels .apiRow .apiErr{flex:1 1 100%;white-space:normal;line-height:1.3}
+
+
+/* The tick column in a multi-select picker. Fixed width so the labels line up
+   whether or not they are selected -- text that shifts sideways as you tick it
+   is hard to read down. */
+.cp-tick{display:inline-block;width:16px;color:var(--ok);font-weight:700}
+#cellpickList .cp-o.on{background:var(--bg)}
+
+/* The "edited after categorization" marker: a drawn notepad in the app's blue.
+   Pencil (invisible), then a red disc (visible but wrong -- red reads as a
+   fault, and a later edit is a note about the row, not an error in it), then
+   an emoji (a rectangle on Windows). It is an inline SVG now; see NOTE_ICON in
+   app.js. The color comes from here through currentColor. */
+.editmark{display:inline-flex;align-items:center;color:var(--accent);
+  cursor:help;margin-left:6px;vertical-align:-4px}
+.editmark:hover{color:var(--tx)}
+
+
+/* TWO NAVIGATIONS, one header.
+   In global scope the company picker and the company screens go, and the
+   installation-wide ones appear. Done with a body class rather than by
+   rebuilding the header, so the buttons keep their identity and their
+   handlers across a scope change. */
+.gnav{display:none}
+body.scope-global .gnav{display:inline-block}
+/* The picker stays in BOTH scopes. It is the way out of a company as well as
+   the way in -- "Engine Dashboard" is its first entry -- so hiding it left the
+   only route back as a separate button that had to be found. */
+/* Rules & Tags is NOT in this list any more: it moved to the dashboard, and
+   being named here as well as carrying .gnav meant it was hidden in the one
+   scope it belongs to and shown in every scope it does not -- with !important,
+   so the .gnav rule could not win. Two rules deciding one button's visibility
+   is one rule too many; which set a button belongs to is now said only by
+   whether it has .gnav. */
+body.scope-global #homeBtn,
+body.scope-global #feedBtn,
+body.scope-global #cardsBtn,
+body.scope-global #auditBtn,
+body.scope-global #setupBtn,
+body.scope-global #brokerBtn,
+body.scope-global #undoBtn{display:none !important}
+/* Home belongs to both: it is the landing page in global scope and the
+   company's own front page inside one. */
+
+/* The company cards on the landing page. */
+.cocard{display:block;width:100%;text-align:left;background:var(--card);
+  border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  cursor:pointer;font:inherit;color:inherit}
+.cocard:hover{border-color:var(--accent);
+  box-shadow:0 6px 18px rgba(31,31,29,.07)}
+.cocard .con{font-size:16px;font-weight:700;margin-bottom:2px}
+.cocard .cometa{font-size:12px;color:var(--tx2)}
+.cogrid{display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-top:4px}
+
+
+/* SWITCHING COMPANY is announced, not slipped in.
+   The grids look alike between companies -- same columns, similar vendors --
+   so a switch that merely redraws is a switch you can miss, and working in the
+   wrong company is the most expensive mistake this app allows. The page fades,
+   a spinner runs, and the name of the company you are entering is on screen
+   while it does.
+   Deliberately a fixed wait rather than "until loaded": the point is that you
+   notice, and a fast switch that finishes in 200ms would not be noticed. */
+/* TEXT ABOVE THE SPINNER, like the screen-change overlay.
+   The spinner is generated content and so painted last, which put the name of
+   the company underneath it while every other wait in the app names itself
+   above. `column-reverse` orders the two without needing the ::before to
+   become an element. */
+#coswitch{position:fixed;inset:0;z-index:9500;display:flex;
+  flex-direction:column-reverse;align-items:center;justify-content:center;
+  gap:18px;background:rgba(247,247,245,.92);
+  animation:cofade .25s ease-out}
+/* Reversed, so the subtitle sits directly under the heading rather than
+   between it and the spinner. */
+#coswitch .cosub{order:1}
+#coswitch .cotxt{order:2}
+@keyframes cofade{from{opacity:0}to{opacity:1}}
+#coswitch::before{content:"";width:92px;height:92px;box-sizing:border-box;
+  border:8px solid rgba(45,106,143,.25);border-top-color:var(--accent);
+  border-radius:50%;animation:gi-spin .8s linear infinite}
+#coswitch .cotxt{font-size:22px;font-weight:700;color:var(--tx)}
+#coswitch .cosub{font-size:15px;color:var(--tx2)}
+
+
+/* The screen-change spinner. Same shape as the company switch, lighter: a
+   screen change is routine and a company change is not, so this one is quieter
+   and lasts exactly as long as the fetch rather than for a fixed time. */
+.bigspin.navwait{background:rgba(247,247,245,.72);flex-direction:column;gap:14px}
+/* Bigger and bold: it names what you are waiting for, which is the
+   only thing on the screen worth reading at that moment. */
+.bigspin .cosub{font-size:17px;font-weight:700;color:var(--tx)}
+
+/* THE AUDIT TOOLBAR STICKS, and the header sticks under it.
+   Both offsets come from one variable so they cannot disagree: the toolbar is
+   at 0, the header at the toolbar's height. A number typed in two places is a
+   number that is right in one of them. */
+/* Neither row is sticky any more: they are outside the scroller, so they
+   cannot scroll away and have nothing to stick to. */
+#auditGrid .apager{margin:0;padding:6px 0 0}
+#auditGrid .gridicons{margin:0;padding:4px 0 8px}
+
+
+/* Payment Plans scrolls inside itself with its header frozen, the same way
+   every other long grid here does. Thirty-odd teams and seventeen columns is
+   a grid you lose your place in without it. */
+/* Not tied to #algoGrid: Payment Plans moved to Teams & Leagues and the
+   stickiness silently stopped applying, because the rule named the container
+   it used to live in rather than the thing it styles. */
+/* THE SCROLLER CLIPS ANYTHING THAT LEAVES IT, which is what hid the renewal
+   years list: a dropdown inside a scrolling box is cut off at its edge. The
+   list is positioned against its own cell, so the box may scroll but must not
+   clip -- vertical scrolling stays, horizontal overflow is allowed to show. */
+.pscroll{overflow-y:auto;overflow-x:visible;max-height:calc(100vh - 300px)}
+.pscroll td{overflow:visible}
+.pscroll .gridtable th{position:sticky;top:0;z-index:12;background:var(--bg)}
+
+
+/* THE PICKER FIELDS MATCH THE REST OF THE DIALOG.
+   .cellsel is built for a grid CELL -- transparent, no border until hover, so
+   it disappears into the row. Dropped into a filter dialog beside bordered
+   inputs it read as a different kind of control, which is what made Vendor and
+   Category stand out. Given the input's own box here, it does not. */
+#auditfilters .filterpick,#advfilters .filterpick,#billfilters .filterpick{
+  border:1px solid var(--line);border-radius:7px;background:var(--card);
+  padding:9px 12px;font-size:14px;width:100%;box-sizing:border-box;
+  min-height:38px}
+#auditfilters .filterpick:hover,#advfilters .filterpick:hover,
+#billfilters .filterpick:hover{border-color:var(--line);background:var(--card)}
+#auditfilters .filterpick:focus,#advfilters .filterpick:focus,
+#billfilters .filterpick:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(45,106,143,.15)}
+/* The caret sits where a select's would, not tight against the text. */
+#auditfilters .filterpick .cs-c,#advfilters .filterpick .cs-c,
+#billfilters .filterpick .cs-c{margin-left:auto;font-size:11px}
+
+
+/* THE ENGINE, upright.
+   The slant was a skewX transform rather than the font's italic, which is why
+   it survived every attempt to turn italics off in the font stack. Removed in
+   both places it was applied -- the sign-in wordmark and the header brand.
+
+   "THE" is the article, not the name: smaller and a shade lighter, so the eye
+   lands on ENGINE. `i` carries no italic here; it is the element that was
+   already available inside the span. */
+/* theEngine: a light gray "the" against a heavy blue "Engine", one size, no
+   space. Weight does the separating as well as color, which is what keeps it
+   legible at header size where a color split alone leans on the capital E. */
+.lmark .the,.brand .the{font-style:normal;font-size:1em;font-weight:400;
+  color:var(--tx2);opacity:1;margin-right:0;letter-spacing:0}
+.lmark,.brand span{font-weight:800}
+
+
+/* THE DASHBOARD'S AUDIT LOG ends where its columns end. Rows are otherwise
+   stretched to at least the full width, which is invisible with seventeen
+   columns but, with the dashboard's five, ran the row lines and the hover
+   stripe on past the last column to the edge of the screen. Details get more
+   room here because on the dashboard they carry most of the information. A
+   company's log does not have this class and is untouched. */
+#auditGrid.audit-dash .ahead,#auditGrid.audit-dash .arow{min-width:0}
+/* At least 560px, and wider if you drag it: column widths live in a page-wide
+   variable, and a fixed width here would have ignored the drag. */
+#auditGrid.audit-dash .c-a-detail{
+  width:max(var(--w-a-detail),560px);flex:0 0 max(var(--w-a-detail),560px)}
+
+
+/* "Updating Grid" uses the screen-change spinner's own classes (bigspin
+   navwait), so it looks exactly like it. The one difference: clicks pass
+   through, because a filter change should not freeze the screen. */
+#gridBusy{pointer-events:none}
+
+
+/* PULL NOW IN GREEN, like every other button that starts something. Outranks
+   .ghost, which paints these white. */
+button.ghost.dvPull,button.ghost.slPull,button.ghost.tkPull{
+  background:#15803d;color:#fff;border:1px solid #15803d;font-weight:600}
+
+
+/* THE SIGN-IN PHOTOGRAPH, in place of the drawn locomotive. COVER, focused a
+   little right of center (66%): the panel is tall and narrow, the photograph
+   wide, and that keeps the engine itself in view rather than the empty track
+   ahead of it. The dark fill shows only for the moment before it loads. */
+#loginbg{background:#2a2f33 url("/static/signin-844.jpg?v=15351cc6") 66% 50% / cover no-repeat !important}
+#loginbg::after{display:none !important}
+@media (max-width:900px){
+  #loginbg{background-position:62% 58% !important}
+}
+
+/* A PICKER SCROLLS WITHIN ITSELF. A long list -- the Strengths picker in
+   Filters -- ran past the bottom of the window, so the page scrolled instead
+   of the list. Capped to the screen, with its buttons pinned to the bottom so
+   Select All / Clear / Close are always reachable. */
+.msmenu{max-height:min(62vh,460px);overflow-y:auto}
+.msmenu .msact{position:sticky;bottom:0;background:var(--card);
+  padding-top:6px;margin-top:4px;border-top:1px solid var(--line)}
+
+
+/* PINNED HEADINGS, engine-wide.
+   In a box that scrolls on its own (QBO Sync, the Rules grid), everything above
+   the grid is pinned by pinAboveGrid(), and the column headers sit beneath it
+   at --pin-top. On a page that scrolls (Configuration, Teams, Algorithms), the
+   row of sub-tabs stays under the main header: its wrapper is what sticks,
+   since the tab row alone could not move outside it. */
+#cardsGrid .gridtable th,#tablesGrid .rulegrid th{top:var(--pin-top,0px)}
+.screen > .screenhead{position:sticky;top:var(--h-header,0px);z-index:30;
+  background:var(--bg);padding-top:6px;margin-top:-6px}
+
+
+/* FIVE BANDS, strongest to weakest: three greens from darkest to palest, then
+   amber and red. The same colors on every pill -- the Bank Feed's % pills,
+   Match Strength, and the Strengths grid. */
+.t-perfect{background:#27500A;color:#EAF3DE}
+.t-very_strong{background:#97C459;color:#173404}
+.t-strong{background:#EAF3DE;color:#27500A;box-shadow:inset 0 0 0 .5px #C0DD97}
+.t-moderate{background:#FAEEDA;color:#633806}
+.t-weak{background:#FCEBEB;color:#791F1F}
+
+/* The Company column, in Multi-Company. */
+.c-company,.b-company{width:150px;flex:0 0 150px;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis}
+
+/* TEAMS & PAYMENT PLANS: the selection box, Team and League stay in view while
+   the grid scrolls sideways through its months. */
+
+/* The red X that closes every pop-up window, top right. */
+.dlgX{position:absolute;top:10px;right:10px;width:26px;height:26px;padding:0;
+  border:0;border-radius:6px;background:#dc2626;color:#fff;font-size:19px;
+  line-height:26px;text-align:center;cursor:pointer;z-index:5}
+.dlgX:hover{background:#b91c1c}
+.dlgX:focus-visible{outline:2px solid #fff;outline-offset:-4px}
+/* Room for the X on BOTH sides, so a centered title stays centered. */
+dialog:has(> .dlgX) > h2:first-of-type, dialog:has(> .dlgX) > h3:first-of-type,
+dialog:has(> .dlgX) > .dlghead:first-of-type{padding-left:36px;padding-right:36px;text-align:center}
+
+/* THE USER GUIDE: readable prose, not a grid. */
+.ug{max-width:900px;line-height:1.6;font-size:14.5px;color:var(--tx);padding-bottom:40px}
+.ug h1{font-size:21px;margin:30px 0 10px;color:var(--accent);scroll-margin-top:calc(var(--h-header,0px) + 60px)}
+.ug h2{font-size:16px;margin:20px 0 6px;scroll-margin-top:calc(var(--h-header,0px) + 60px)}
+.ug p{margin:0 0 10px}
+.ug ul,.ug ol{margin:0 0 12px;padding-left:22px}
+.ug li{margin:0 0 5px}
+.ug-toc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 18px;margin:6px 0 10px}
+.ug-toc ol{columns:2;margin:6px 0 0;padding-left:20px}
+.ug-tw{overflow-x:auto;margin:0 0 14px}
+.ug-t{border-collapse:collapse;width:100%;font-size:13.5px}
+.ug-t th{background:var(--accent);color:#fff;text-align:left;padding:7px 10px;font-weight:600}
+.ug-t td{border:1px solid var(--line);padding:7px 10px;vertical-align:top}
+.ug-t tr:nth-child(even) td{background:var(--card)}
+
+/* Band pills take their colors from the bands (loadBands writes them); the old
+   fixed light-green outline is not wanted on an edited color. */
+.t-strong{box-shadow:none}
+
+/* The User Guide's cover, as on the sign-in screen. */
+.ug-cover{background:#2a2f33 url("/static/signin-844.jpg") 66% 50% / cover no-repeat;border-radius:10px;
+  overflow:hidden;margin:0 0 14px}
+.ug-cover-in{background:rgba(0,0,0,.45);padding:56px 24px;text-align:center;color:#fff}
+.ug-brand{font-size:52px;font-weight:700;line-height:1}
+.ug-brand i{font-size:26px;font-weight:400;margin-right:6px;vertical-align:18px}
+.ug-sub{font-size:18px;margin-top:10px;opacity:.95}
+.ug-t td svg{display:block}
+
+/* Settings: a dropdown's choices centered, closed and open. */
+select.setCenter{text-align:center;text-align-last:center}
+select.setCenter option{text-align:center}
+
+/* FROZEN COLUMNS: a row clips its overflow without becoming a scroll box of
+   its own, so its pinned cells can stick to the grid's left edge. */
+body.freeze-cols #gridscroll .row{overflow:clip}
+
+/* In use, inside the Filters windows: light blue, as in the filter row. */
+#advfilters .fon,#billfilters .fon,#auditfilters .fon,
+#advfilters .msbtn.on,#billfilters .msbtn.on,#auditfilters .msbtn.on{background:#e8f1fb}
+
+/* THE HEADER FITS ANY WINDOW: tighter first, then a second line -- never a
+   button pushed off the right edge (the Dashboard's eight did, at 1280px). */
+header{flex-wrap:wrap;row-gap:6px}
+@media (max-width:1500px){
+  header .brand{transform:scale(.78);transform-origin:right center;margin-left:-24px}
+  header button.ghost{padding-left:9px;padding-right:9px}
+  header{gap:9px}
+}
+@media (max-width:1150px){
+  header .brand{display:none}
+}
+
+/* Text for screen readers only. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* The company picker's divider lines, in the picker's own blue. */
+#company hr{border:0;border-top:1px solid var(--accent);color:var(--accent);background:var(--accent);height:1px;margin:2px 0}
+
+/* THE STYLEABLE PICKER (Chrome and Edge 135+). The browser's own dropdown
+   draws its divider lines black whatever the CSS says, and is as wide as the
+   closed picker. As a styleable select the dividers take the blue, and the
+   open list is as wide as its longest company -- so the closed picker can be
+   only as wide as the name it shows. Other browsers keep the plain dropdown. */
+@supports (appearance: base-select) {
+  #company, #company::picker(select){appearance:base-select}
+  #company{display:inline-flex;align-items:center;gap:10px}
+  #company::picker-icon{color:var(--accent);transition:rotate .15s}
+  #company:open::picker-icon{rotate:180deg}
+  #company::picker(select){width:max-content;min-width:anchor-size(width);max-width:min(560px,92vw);
+    max-height:70vh;margin-top:4px;padding:4px 0;border:1px solid var(--line);border-radius:9px;
+    background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+  #company option{padding:7px 16px;font-size:15px;font-weight:500;color:#1f1f1d;white-space:nowrap}
+  #company option::checkmark{display:none}
+  #company option:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  #company option:hover{background:#eef3fa}
+  #company option:checked{color:var(--accent);font-weight:700;background:#e8f0fb}
+  #company hr{border:0;border-top:1.5px solid var(--accent);height:0;margin:4px 0;background:none}
+}
+
+/* ONE HEADER STYLE, EVERYWHERE: white, bold, all capitals, 13px, the same ink.
+   Some grids had an off-white header and one a smaller size; every grid now
+   reads the same. */
+table.gridtable th, table.rulegrid th{background:#fff !important;color:#1f1f1d !important;
+  font-weight:700 !important;text-transform:uppercase !important;font-size:13px !important}
+#colhead{background:#fff !important}
+#colhead > *{color:#1f1f1d;font-weight:700;text-transform:uppercase;font-size:13px}
+/* The quick search's clear X, in red, as the engine's other X's. */
+.gi-clear{color:var(--bad) !important;border-color:var(--bad) !important}
+/* ...and the X beside ANY quick search, however the screen builds it. */
+input[placeholder^="Quick search"] + button, input[placeholder^="Quick search"] + .ghost{color:var(--bad) !important;border-color:var(--bad) !important}
+
+/* THE GUIDE: an outline down the left, the guide beside it. */
+.ug{max-width:none}
+.ug-wrap{display:flex;gap:28px;align-items:flex-start}
+.ug-side{position:sticky;top:calc(var(--h-header,0px) + 64px);flex:0 0 250px;max-height:calc(100vh - var(--h-header,0px) - 84px);
+  overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 10px;font-size:13px}
+.ug-side ul{list-style:none;margin:6px 0 0;padding:0}
+.ug-side ul ul{margin:2px 0 6px 12px}
+.ug-side a{display:block;padding:3px 6px;border-radius:5px;color:var(--tx);text-decoration:none}
+.ug-side a:hover{background:var(--chip)}
+.ug-side .ug-s1{font-weight:700}
+.ug-side .ug-s2{color:var(--tx2)}
+.ug-main{flex:1;min-width:0;max-width:900px}
+.ug h3{font-size:14.5px;margin:16px 0 6px}
+
+/* The Companies filter exists only in Multi-Company (body.multi-co, set from
+   the company picker). Whatever a render in flight draws, a single company
+   never shows it. */
+body:not(.multi-co) #fcompWrap, body:not(.multi-co) .qcompWrap{display:none !important}
+
+/* THE AMOUNT CELL CARRIES MORE THAN THE AMOUNT: the PAYMENT / REFUND pill, the
+   Match Transfer button and the near-miss hint. Cut off with an ellipsis, the
+   pill read "PAYMENT..." and the button was hidden -- so it could not be
+   pressed. They wrap within the cell instead. */
+#list .c-amt{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;
+  line-height:1.6;height:auto}
+#list .c-amt .tag,#list .c-amt .tmMatch{white-space:nowrap;display:inline-block}
+
+/* THE HOVER MENUS LOOK LIKE THE NAVIGATION. A top button turns the selected
+   blue while the pointer is on it or on its open menu; the menu is a stack of
+   the same rounded buttons -- same size, font and colors -- each turning blue
+   under the pointer. */
+header button.ghost.navhover,
+#homeBtn:hover,#feedBtn:hover,#cardsBtn:hover,#auditBtn:hover,#setupBtn:hover,#brokerBtn:hover,
+#gHomeBtn:hover,#teamsBtn:hover,#algoBtn:hover,#tablesBtn:hover,#companiesBtn:hover,
+#usersBtn:hover,#gAuditBtn:hover,#guideBtn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.navmenu{display:flex;flex-direction:column;gap:5px;padding:6px !important;border-radius:9px !important}
+.navmenu .navmenuItem{background:var(--card);border:1px solid var(--line);border-radius:7px;
+  padding:6px 11px !important;font-size:inherit !important;color:var(--tx);line-height:1.2}
+.navmenu .navmenuItem:hover{background:var(--accent) !important;color:#fff;border-color:var(--accent)}
+
+/* A grid's red x, filled like the windows' X (marked in a11yFix). */
+button.xfill{background:#fff !important;color:#dc2626 !important;border-color:#dc2626 !important}
+button.xfill:hover{background:#fee2e2 !important;border-color:#b91c1c !important}
+/* The quick search's clear x too: its own rule forced red text, red on red. */
+.gi-clear.xfill{color:#dc2626 !important;border-color:#dc2626 !important;background:#fff !important}
+
+/* WHITE BUTTONS ARE OUTLINED IN BLACK, so each is clearly a button: the ghost
+   buttons, the tab rows, the navigation and its hover menus. A button that is
+   on, or blue under the pointer, keeps its blue outline (the rules after). */
+/* (Outlines stay the original light gray: tried darker, put back.) */
+header button.ghost.on, nav button.on, .screentabs button.on,
+header button.ghost.navhover, .navmenu .navmenuItem:hover,
+#homeBtn:hover,#feedBtn:hover,#cardsBtn:hover,#auditBtn:hover,#setupBtn:hover,#brokerBtn:hover,
+#gHomeBtn:hover,#teamsBtn:hover,#algoBtn:hover,#tablesBtn:hover,#companiesBtn:hover,
+#usersBtn:hover,#gAuditBtn:hover,#guideBtn:hover{border-color:var(--accent)}
+.filters .on,.filters button.on{border-color:#bcd9ee}
+
+/* THE HOVER MENU IS ONLY ITS BUTTONS: no panel behind them. The panel showed
+   at the edges of the stack, an older box peeking out from under it. */
+/* THE HOVER MENU: one solid rounded panel holding its buttons, sized to them
+   -- nothing wider behind it to stick out. */
+.navmenu{background:var(--card) !important;border:1px solid var(--line) !important;border-radius:10px !important;
+  padding:5px !important;box-shadow:0 8px 22px rgba(0,0,0,.14) !important;min-width:0 !important;
+  gap:4px !important;width:max-content}
+/* Add / Edit Leagues: its header row stays at the top of the scrolling list. */
+.lgScroll table.gridtable tr:first-child th{position:sticky;top:0;z-index:2}
+
+/* (The Updating pill is gone: actions use the middle-of-screen circle, .bigspin.) */
+
+/* THE ACCOUNT MENU: narrower, with larger Profile and Sign Out. Its width was
+   set by the signed-in name above them; that line is cut short instead. */
+.avatarmenu{width:max-content !important;min-width:0 !important;padding:6px 4px !important}  /* just wider than its longest line */
+.avatarmenu .who{white-space:nowrap;width:0;min-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}  /* the menu is as wide as its buttons need; a long name is cut */
+.avatarmenu button{font-size:15px !important;padding:8px 10px !important}
+/* RIGHT-ALIGNED under the avatar, and narrower: Profile and Sign Out sit at
+   the menu's right edge, with only a little room around them. */
+.avatarmenu{padding:4px 3px !important}
+.avatarmenu button{text-align:right !important;padding:6px 8px !important;font-size:14px !important}
+.avatarmenu .who{text-align:right;padding:4px 8px}
+/* PAYMENT PLANS: the header's column lines carried down through every row,
+   so twelve narrow month columns read as columns. */
+.pscroll .gridtable td{border-right:1px solid var(--line)}
+.pscroll .gridtable td:last-child{border-right:none}
+/* HOVER IS A LIGHTER BLUE THAN SELECTED. The top navigation, the tab rows and
+   the hover menus turned the same solid blue under the pointer as the screen
+   or tab you are on, so two buttons looked selected at once. Under the
+   pointer: light blue with dark text. The one you are on keeps solid blue. */
+header button.ghost.navhover:not(.on),
+#homeBtn:hover:not(.on),#feedBtn:hover:not(.on),#cardsBtn:hover:not(.on),#auditBtn:hover:not(.on),
+#setupBtn:hover:not(.on),#brokerBtn:hover:not(.on),#gHomeBtn:hover:not(.on),#teamsBtn:hover:not(.on),#algoBtn:hover:not(.on),
+#tablesBtn:hover:not(.on),#companiesBtn:hover:not(.on),#usersBtn:hover:not(.on),
+#gAuditBtn:hover:not(.on),#guideBtn:hover:not(.on),
+.screentabs button:hover:not(.on), nav button[data-s]:hover:not(.on),
+#codingBtn:hover:not(.on), #ccProfilesBtn:hover:not(.on), .qsTab:hover:not(.on),
+.navmenu .navmenuItem:hover{background:#dbeafe !important;color:#1e3a5f !important;border-color:#93c5fd !important}
+button.xfill:disabled{opacity:.35 !important;cursor:not-allowed !important}
+
+/* PAYMENT PLANS: no frozen columns (removed as asked); the header row still stays on top. */
+
+/* QBO SYNC PAGES: a row on another page is hidden by its class, so the quick
+   search's own show / hide (its style) is left alone. */
+tr.pg-off{display:none !important}
+/* BROKER DATA's grids scroll sideways in their own box on a narrow window;
+   the page never does. */
+#brokerGrid{max-width:100%;overflow-x:auto}
+/* THE AUDIT LOG LOOKS LIKE EVERY OTHER GRID: a white card with the same
+   border and rounded corners, a white header with its line beneath, and row
+   lines that stop at the last row. */
+#auditRows{background:var(--card);border:1px solid var(--line);border-radius:8px;box-sizing:border-box}
+#auditGrid .ahead{background:var(--card) !important;border-top-left-radius:8px;border-top-right-radius:8px}
+#auditGrid .arow:last-child{border-bottom:none}
+/* ON THE DASHBOARD the card ends where its columns end -- full width, it read
+   as a blank column running on to the edge of the screen. */
+#auditGrid.audit-dash #auditRows{border-radius:8px;width:max-content;max-width:100%}
+
+/* EVERY ROW'S SAVE IS ALWAYS THERE: gray while there is nothing to save,
+   green once the row is changed (the code that used to reveal it now turns
+   it green). Gray cannot be pressed. */
+.ruleSave[style*="visibility:hidden"],
+.ruleSave[style*="visibility: hidden"],
+.ruleSave[style*="display:none"],
+.ruleSave[style*="display: none"],
+.wtRowSave[style*="visibility:hidden"],
+.wtRowSave[style*="visibility: hidden"],
+.wtRowSave[style*="display:none"],
+.wtRowSave[style*="display: none"],
+.pfSaveRow[style*="visibility:hidden"],
+.pfSaveRow[style*="visibility: hidden"],
+.pfSaveRow[style*="display:none"],
+.pfSaveRow[style*="display: none"],
+.sgRowSave[style*="visibility:hidden"],
+.sgRowSave[style*="visibility: hidden"],
+.sgRowSave[style*="display:none"],
+.sgRowSave[style*="display: none"],
+.ctRowSave[style*="visibility:hidden"],
+.ctRowSave[style*="visibility: hidden"],
+.ctRowSave[style*="display:none"],
+.ctRowSave[style*="display: none"],
+.cxRowSave[style*="visibility:hidden"],
+.cxRowSave[style*="visibility: hidden"],
+.cxRowSave[style*="display:none"],
+.cxRowSave[style*="display: none"],
+.cardSave[style*="visibility:hidden"],
+.cardSave[style*="visibility: hidden"],
+.cardSave[style*="display:none"],
+.cardSave[style*="display: none"],
+.qrSave[style*="visibility:hidden"],
+.qrSave[style*="visibility: hidden"],
+.qrSave[style*="display:none"],
+.qrSave[style*="display: none"],
+.sugSave[style*="visibility:hidden"],
+.sugSave[style*="visibility: hidden"],
+.billUpdSave[style*="visibility:hidden"],
+.billUpdSave[style*="visibility: hidden"],
+.usSave[style*="visibility:hidden"],
+.usSave[style*="visibility: hidden"],
+.roleSave[style*="visibility:hidden"],
+.roleSave[style*="visibility: hidden"],
+.graySave[style*="visibility:hidden"],
+.graySave[style*="visibility: hidden"],
+.graySave[style*="display:none"],
+.graySave[style*="display: none"],
+.setSave[style*="visibility:hidden"],
+.setSave[style*="visibility: hidden"],
+button.isIdle{visibility:visible !important;display:inline-block !important;
+  background:#e5e7eb !important;color:#9ca3af !important;border-color:#e5e7eb !important;
+  cursor:default !important;pointer-events:none}
+/* THE ACCOUNT MENU, just wider than its words: each button its own width
+   (a 100% width made the menu as wide as the widest line could ever be),
+   right-aligned, Profile and Sign Out the same size. */
+.avatarmenu button{width:auto !important;display:block !important;margin-left:auto !important;
+  font-size:14px !important;padding:6px 10px !important}
+
+/* CHANGE AMOUNT (bills): everything centered -- the bill's details, the
+   choices, the figure and the note under it. */
+#billamt{text-align:center}
+#billamt #billamtWho{text-align:center}
+#billamt select,#billamt label{margin-left:auto;margin-right:auto}
+#billamt #billamtValueRow{justify-content:center}
+#billamt #billamtHowBox label{justify-content:center}
+
+/* RENEWAL STATUS WORDS: cells wrap (a status's name sits over what it is
+   treated as; the Engine Notation shows in full). */
+.rsGrid td{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;vertical-align:top}
