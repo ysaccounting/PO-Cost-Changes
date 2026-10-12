@@ -128,6 +128,7 @@ A full run is long, so Claude runs it in stages and may report as each finishes.
 - Match Transfer with both sides in For Review writes the payment once, directly, and links the checking side; a QuickBooks refusal names its reason and moves neither row; another post of the same payment is waited for and its entry used. The automatic payment poster leaves both sides of a pair, and the primary account, to Match Transfer.
 - Renewal Status Words: Renewed, In Progress and Not Renewed built in; the Dashboard owns the Engine Notation and colors (and can add statuses), a company adds its notation and statuses of its own; a word means one status; each word's pill takes its status's color.
 - Company settings: ignoring the Dashboard's Teams drops their bank details, venues and names for that company only; opting out of Multi-Company rules removes them from its rules and its list.
+- Profile Rules keep a Rule Name; a Vendor exception treats the buyer email as a perfect match; grid widths are kept per grid (by its headings) and per tab.
 - Ignore Rows Where: any number of conditions, any one skipping a row, with is / is not / is any of / is none of / is empty / is not empty and amount comparisons.
 - Allow Statements (Plaid update mode) reads statements again at once and never reports a card on the same login as "another bank login"; plan day pills read as the Payment Plans window writes them (1st M, Last M, 15th, Last day).
 - Scheduled jobs: a failing provider never stops the others; inside Plaid, one company never stops the next; failures are recorded by name.

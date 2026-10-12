@@ -8521,12 +8521,12 @@ $('#ccProfilesBtn').onclick = async () => {
   openFeedView('profiles');
   const box = $('#ccProfilesGrid');
   if (isAllCompanies()) {
-    box.innerHTML = `<div class="empty" style="padding:28px 20px"><b>Credit Card Profiles</b> are
+    box.innerHTML = `<div class="empty" style="padding:28px 20px"><b>Profile Rules</b> are
       set per company \u2014 choose a company in the picker to open them.</div>`;
     return;
   }
   PF = null;   // opened afresh: unsaved edits (and their Save buttons) dropped
-  await withWait('Credit Card Profiles', () => renderProfilesTab(box));
+  await withWait('Profile Rules', () => renderProfilesTab(box));
 };
 
 $('#sgFeedBtn').onclick = async () => {
@@ -9018,7 +9018,13 @@ function gwFitTable(table) {
         if (ths.length < 3 || ths.some(th => th.classList.contains('gwcol') || th.querySelector('.rz'))) return;
         const holder = tb.closest('[id]');
         const idx = holder ? [...holder.querySelectorAll('table.gridtable, table.rulegrid')].indexOf(tb) : i;
-        wireGridResize(`${holder ? holder.id : 'grid'}__${idx}`, tb);
+        // KEYED BY THE GRID ITSELF -- its headings -- not by its position: two
+        // tabs drawing into one box (Algorithms' Signals and Strengths) each had
+        // a "first table" under the same key, so widening one widened the other.
+        const sig = ths.map(th => (th.dataset.col || th.textContent || '').trim().toLowerCase()).join('|');
+        let h = 0;
+        for (let k = 0; k < sig.length; k++) h = (h * 31 + sig.charCodeAt(k)) | 0;
+        wireGridResize(`${holder ? holder.id : 'grid'}__${idx}_${(h >>> 0).toString(36)}`, tb);
       });
     }, 150);
   };
@@ -9038,7 +9044,11 @@ function wireGridResize(key, tableEl) {
   const baseKey = key;
   const TAB_OF = {setupGrid: () => SETUP_TAB, brokerGrid: () => BROKER_TAB, teamsGrid: () => TEAMS_TAB, algoGrid: () => ALGO_TAB,
                   tablesGrid: () => TABLE_TAB2, cardsGrid: () => QBO_TAB};
-  if (TAB_OF[key]) { try { const t = TAB_OF[key](); if (t) key = `${key}:${t}`; } catch (e) {} }
+  // The box's own tab, also for a grid wired by its box and position ("algoGrid__0_x").
+  {
+    const _base = key.split('__')[0];
+    if (TAB_OF[_base]) { try { const t = TAB_OF[_base](); if (t) key = `${_base}:${t}` + key.slice(_base.length); } catch (e) {} }
+  }
   const ths = [...table.querySelectorAll('tr:first-child th')];
   if (!ths.length) return;
 
@@ -11862,7 +11872,7 @@ async function renderMatchRulesGrid(box) {
   // tickboxes but did not let the value be edited.
   const ITEMS = [['bank_detail', 'Bank Detail'], ['vendor', 'Vendor']];
   const OPS = [['contains', 'Contains'], ['equals', 'Equals']];
-  const EXC = [['ignore_email', 'Ignore email address'],
+  const EXC = [['ignore_email', 'Treat buyer email as perfect match'],
                ['match_vendor', 'Match to vendor']];
   const opt = (list, chosen) => list.map(([v, l]) =>
     `<option value="${esc(v)}"${v === chosen ? ' selected' : ''}>${esc(l)}</option>`
@@ -11931,8 +11941,10 @@ async function renderMatchRulesGrid(box) {
     const byDetail = $('#mrItem').value === 'bank_detail';
     // Stated rather than chosen: with one option per item, a dropdown was a
     // control that could only ever be set to what it already said.
+    // A VENDOR on the bill: the buyer email is treated as a perfect match
+    // (a marketplace whose bills carry its own address, not the buyer's).
     $('#mrExcCell').textContent = byDetail ? 'Match to vendor'
-                                           : 'Ignore email address';
+                                           : 'Treat buyer email as perfect match';
     $('#mrVendorPick').style.visibility = byDetail ? '' : 'hidden';
   };
   $('#mrItem').onchange = syncExc;
@@ -13917,7 +13929,7 @@ async function renderProfilesTab(box) {
     PF = {company: company(), rows: j.rules || [], accounts: j.accounts || [],
           teams: j.teams || [], find: '', dirty: false};
   }
-  const NEWPF = () => ({source: '', op: 'any', value: '', teams: ['Any'], profile: ''});
+  const NEWPF = () => ({name: '', source: '', op: 'any', value: '', teams: ['Any'], profile: ''});
   PF.newRow = PF.newRow || NEWPF();
   PF.sel = PF.sel || new Set();          // ticked rows, by position
   const green = 'background:#15803d;color:#fff;border:1px solid #15803d;'
@@ -13955,15 +13967,16 @@ async function renderProfilesTab(box) {
       <!-- NAMED COLUMNS, so widths saved before the drag handle was added
            don't land on the wrong column. -->
       <tr><th data-col="grip" style="width:34px"></th><th data-col="pick" style="width:30px"><input type="checkbox" id="pfPickAll"
-             title="Select every row" style="width:auto" ${PF.rows.length && PF.sel.size === PF.rows.length ? 'checked' : ''}></th><th data-col="n" style="width:36px">#</th><th data-col="acct" style="width:160px">Card Account</th><th data-col="op" style="width:110px">Bank Detail Rule</th>
+             title="Select every row" style="width:auto" ${PF.rows.length && PF.sel.size === PF.rows.length ? 'checked' : ''}></th><th data-col="n" style="width:36px">#</th><th data-col="rname" style="width:150px">Rule Name</th><th data-col="acct" style="width:160px">Card Account</th><th data-col="op" style="width:110px">Bank Detail Rule</th>
           <th data-col="val" style="width:210px">Bank Detail Value (Comma Separated)</th><th data-col="team" style="width:150px">Team</th>
           <th data-col="prof" style="width:160px">Profile</th><th data-col="act" style="width:150px"></th></tr>
       ${PF.rows.map((r, i) => {
-        const hay = `${acctName(r.source)} ${r.value} ${(r.teams || []).join(' ')} ${r.profile}`.toLowerCase();
+        const hay = `${r.name || ''} ${acctName(r.source)} ${r.value} ${(r.teams || []).join(' ')} ${r.profile}`.toLowerCase();
         return `<tr data-i="${i}" class="pfRow" style="${q && !hay.includes(q) ? 'display:none' : ''}">
           <td style="text-align:center">${GRIP}</td>
           <td><input type="checkbox" class="pfPick" data-i="${i}" ${PF.sel.has(i) ? 'checked' : ''} style="width:auto"></td>
           <td style="color:var(--tx2)">${i + 1}</td>
+          <td><input class="pfName" value="${esc(r.name || '')}" placeholder="Rule name" style="width:100%"></td>
           <td><button class="ghost pfAcct cellsel" style="width:100%;text-align:left"
                title="${esc(acctLabel(r, true))}"><span class="cs-v">${esc(acctLabel(r))}</span><span class="cs-c">\u25be</span></button></td>
           <td><select class="pfOp" style="width:100%">
@@ -13985,6 +13998,7 @@ async function renderProfilesTab(box) {
       ${(() => { const r = PF.newRow; return `<tr data-i="new">
           <td></td><td></td>
           <td style="color:var(--tx2)">${PF.rows.length + 1}</td>
+          <td><input class="pfName" value="${esc(r.name || '')}" placeholder="Rule name" style="width:100%"></td>
           <td><button class="ghost pfAcct cellsel" style="width:100%;text-align:left"
                title="${esc(acctLabel(r, true))}"><span class="cs-v">${esc(acctLabel(r))}</span><span class="cs-c">\u25be</span></button></td>
           <td><select class="pfOp" style="width:100%">
@@ -14111,6 +14125,7 @@ async function renderProfilesTab(box) {
   box.querySelectorAll('.pfOp').forEach(el => el.onchange = () => { rowOf(el).op = el.value; if (el.value !== 'contains') rowOf(el).value = ''; PF.dirty = true; renderProfilesTab(box); });
   box.querySelectorAll('.pfVal').forEach(el => el.oninput = () => { rowOf(el).value = el.value; dirty(el); });
   box.querySelectorAll('.pfProf').forEach(el => el.oninput = () => { rowOf(el).profile = el.value; dirty(el); });
+  box.querySelectorAll('.pfName').forEach(el => el.oninput = () => { rowOf(el).name = el.value; dirty(el); });
   // REORDERED BY DRAGGING a row's handle; the new order is saved at once (the
   // first matching row wins, so the order is the rule).
   wireRowDrag(box.querySelector('table.gridtable'), 'tr.pfRow', async (f, t) => {
@@ -14118,7 +14133,7 @@ async function renderProfilesTab(box) {
   });
   box.querySelectorAll('.pfDel').forEach(el => el.onclick = async () => {
     // REMOVED AT ONCE, after the one question -- no second Save.
-    if (!await askConfirm('Remove this row?', '', 'Remove', 'Cancel')) return;
+    if (!await askConfirm('Remove this rule?', '', 'Remove', 'Cancel')) return;
     PF.rows.splice(Number(el.closest('tr').dataset.i), 1); PF.dirty = true; PF.sel = new Set(); await saveAll(); });
   // TEAM: a multi-select with Any first. Ticking a team clears Any; ticking Any
   // (or clearing every team) goes back to Any.
@@ -20002,7 +20017,7 @@ async function renderConnectorsTab(box) {
            ${(a.kind === 'quickbooks' && conn.realm_id) || (a.kind && a.kind !== 'quickbooks' && cnShown(a.kind))
              // ONE PER COMPANY: grayed out once added (QuickBooks once connected).
              // GRAYED BUT READABLE: dark gray text, not see-through.
-             ? `disabled title="Already ${a.kind === 'quickbooks' ? 'connected' : 'added'} for this company" style="color:#6b7280;background:#f3f4f6;cursor:not-allowed;`
+             ? `disabled title="Already ${a.kind === 'quickbooks' ? 'connected' : 'added'} for this company" style="color:#6b7280;cursor:not-allowed;`
              : 'style="'}display:flex;align-items:center;gap:8px;width:100%;
                   text-align:left;border:0;padding:6px 8px;font-size:13px"
            >${a.html}</button>`).join('');
@@ -21231,7 +21246,7 @@ document.addEventListener('visibilitychange', () => {
     feedBtn: {screen: 'feed', items: () => [
       ...[...document.querySelectorAll('nav button[data-s]')].map(b => [b.dataset.s, b.textContent.replace(/\s*\(\d[\d,]*\)\s*$/, '').trim()]),
       ['coding', 'Bank Feed Rules'], ['sgs', 'Suggestions'],
-      ...(isAllCompanies() ? [] : [['ccprofiles', 'Credit Card Profiles']])]},
+      ...(isAllCompanies() ? [] : [['ccprofiles', 'Profile Rules']])]},
     cardsBtn: {screen: 'cards', items: () => [['cards', 'Bank / Card Accounts'], ['api', 'API Card Connections'],
       ['account', 'Chart of Accounts'], ['vendor', 'Vendors'], ['scan', 'Deletion / Edit Scan']]},
     setupBtn: {screen: 'setup', items: () => [...document.querySelectorAll('[data-su]')].map(b => [b.dataset.su, b.textContent.trim()])},

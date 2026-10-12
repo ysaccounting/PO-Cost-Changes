@@ -122,8 +122,8 @@ GUIDE = [
                 "offered as matches."],
 ]),
 ("p", "Three more buttons sit at the end of the same row. **Bank Feed Rules** opens the rules that set vendor "
-      "and category; **Suggestions** lists the vendor and category this company's past coding suggests (below); "
-      "and **Credit Card Profiles** opens the rules that set the Profile for general cards. All three "
+      "and category; **Profile Rules** opens the rules that set the Profile for general cards; and "
+      "**Suggestions** lists the vendor and category this company's past coding suggests (below). All three "
       "keep the Bank Feed's tabs in view; clicking any tab returns to the charges."),
 ("h2", "Filters"),
 ("ul", [
@@ -300,16 +300,16 @@ GUIDE = [
       "variance."),
 ("h2", "The Profile column"),
 ("p", "The Profile column is the person a charge belongs to. It comes from the cardholder name, or from "
-      "Credit Card Profiles for general cards used for several people; a profile set by a Credit Card Profiles rule "
+      "Profile Rules for general cards used for several people; a profile set by a Profile Rule "
       "has the blue **RULE** badge after it, and hovering over it names the rule."),
 ("p", "Typing a profile in for a charge also fills every other For Review charge on the same card (same card "
       "account and last four) whose profile is still blank."),
 
-("h2", "Credit Card Profiles"),
+("h2", "Profile Rules"),
 ("p", "The button at the end of the Bank Feed's tab row. Rules that set the Profile for general cards: card "
       "account -- one or several, ticked in the same picker as the Bank Feed's, from every card account in the "
       "company's QuickBooks file, connected or not -- bank detail (Contains "
-      "or Any), team, and the profile. Tick rows (or every row in the header) for **Batch Actions**, as on Bank Feed "
+      "or Any), team, and the profile, each with an optional **Rule Name** in the first column. Tick rows (or every row in the header) for **Batch Actions**, as on Bank Feed "
       "Rules: set the Card Account, Bank Detail Rule, Team or Profile of every ticked row, or delete them. The first matching row wins; drag a row by its handle at the left to "
       "change the order (saved at once), and its red x removes it at once. A new row is filled in on the grid's last row and added with its "
       "**Add** button, as on Bank Feed Rules; **Download Template** and **Upload From Excel** sit after the quick search. A changed row shows its own Save; saving also fills "
@@ -577,7 +577,9 @@ GUIDE = [
                 "one. Charges are regraded at their next rescoring."],
   ["Monthly Payments", "How installment plans are recognized and checked. Each row has its own Save."],
   ["Ignored Words", "Words in bank descriptions that should not count as evidence."],
-  ["Exceptions", "Deliberate exceptions to the usual matching."],
+  ["Exceptions", "Deliberate exceptions to the usual matching: when a **Bank Detail** contains or equals a value, "
+                 "match it to a chosen vendor; when the **Vendor** on the bill contains or equals a value, treat the "
+                 "buyer email as a perfect match (for a seller whose bills carry its own address, not the buyer's)."],
   ["Suggestions", "Each setting with what it means beside it, as on Signals, and its own Save. What makes the Engine suggest a vendor and category from past coding, for every company: how "
                   "many **similar past codings** it needs (5 to start), how many must **agree** (90% to start), what "
                   "makes two charges **similar** (the bank detail always; the card account, the cardholder and the "

@@ -1733,7 +1733,16 @@ tr.pg-off{display:none !important}
 #auditGrid .arow:last-child{border-bottom:none}
 /* ON THE DASHBOARD the card ends where its columns end -- full width, it read
    as a blank column running on to the edge of the screen. */
-#auditGrid.audit-dash #auditRows{border-radius:8px;width:max-content;max-width:100%}
+/* ...and its scroll bar sits at the side of the screen, as on every other
+   grid: the scrolling box is full width and clear, and the card look (white,
+   bordered, rounded) is drawn on the rows, which end where the columns end. */
+#auditGrid.audit-dash #auditRows{width:auto;max-width:none;border:none;background:transparent;border-radius:0}
+#auditGrid.audit-dash .ahead,#auditGrid.audit-dash .arow{width:max-content;background:var(--card);
+  border-left:1px solid var(--line);border-right:1px solid var(--line);box-sizing:border-box}
+#auditGrid.audit-dash .ahead{border-top:1px solid var(--line);border-top-left-radius:8px;border-top-right-radius:8px}
+#auditGrid.audit-dash .arow:last-child{border-bottom:1px solid var(--line) !important;
+  border-bottom-left-radius:8px;border-bottom-right-radius:8px}
+#auditGrid.audit-dash .arow:hover{background:var(--bg)}
 
 /* EVERY ROW'S SAVE IS ALWAYS THERE: gray while there is nothing to save,
    green once the row is changed (the code that used to reveal it now turns
@@ -1804,3 +1813,8 @@ button.isIdle{visibility:visible !important;display:inline-block !important;
 /* RENEWAL STATUS WORDS: cells wrap (a status's name sits over what it is
    treated as; the Engine Notation shows in full). */
 .rsGrid td{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;vertical-align:top}
+/* ONE LOADING SCREEN AT A TIME. Two could be up at once (a screen and its tab,
+   or a grid's own), each with its words and its translucent veil -- the words
+   showed twice, one blurred behind the other. Any loading screen with a later
+   one showing steps aside for it. */
+.bigspin:has(~ .bigspin:not([style*="display: none"]):not([style*="display:none"])){visibility:hidden}

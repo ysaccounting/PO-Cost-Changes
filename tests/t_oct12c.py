@@ -150,5 +150,32 @@ check("17: Bank Feed Rules number their rows", "data-col=\"rn\" style=\"width:36
 check("18: Credit Card Profiles: a select column and Batch Actions",
       'class="pfPick"' in JS and 'id="pfBatch"' in JS and "pfbGo" in JS)
 
+check("19: Profile Rules: renamed, after Bank Feed Rules, with a Rule Name column, and 'Remove this rule?'",
+      HTML.index('id="ccProfilesBtn"') < HTML.index('id="sgFeedBtn"') and ">Profile Rules</button>" in HTML
+      and 'data-col="rname"' in JS and "askConfirm('Remove this rule?'" in JS)
+from app.profiles import clean as _pclean
+check("…and the rule name is kept", _pclean([{"name": "Amex Pat", "source": "amex", "profile": "Pat"}])[0]["name"] == "Amex Pat")
+# 20: a VENDOR exception treats the buyer email as a perfect match.
+import importlib as _il; _sg = _il.import_module("engine.suggest")
+from types import SimpleNamespace as _NS
+_sg.set_match_rules([{"bank_detail": "stubhub", "item": "vendor", "op": "contains", "ignore_email": True}])
+_ch = _NS(merchant="TM TICKETS", email="", cardholder_name="Pat Doe", order_number=None, amount=100, txn_date=None)
+_bl = _NS(vendor="StubHub Inc", memo="Bulls / x@stubhub.com", email="x@stubhub.com", order_number=None)
+_rules = _sg.rules_for_charge(_ch, _bl)
+check("20: a vendor exception applies to a bill whose vendor contains the value", len(_rules) == 1, _rules)
+check("…and its exception reads 'Treat buyer email as perfect match'", "Treat buyer email as perfect match" in JS)
+src_s = open(os.path.join(ROOT, "engine/suggest.py")).read()
+check("…and scores the email signal in full", "rule: buyer email treated as a perfect match" in src_s and 'score += _W["email"]' in src_s)
+_sg.set_match_rules([])
+check("21: grids are kept apart by their own headings, per tab", "KEYED BY THE GRID ITSELF" in JS and "key.split('__')[0]" in JS)
+check("21: Order Number's meaning reads as asked", '"The order number on the transaction matches the one on the bill."' in open(
+    os.path.join(ROOT, "app/api.py")).read())
+
+check("22: the Dashboard Audit Log scrolls in a full-width box (scroll bar at the side)",
+      "#auditGrid.audit-dash #auditRows{width:auto;max-width:none" in CSS)
+check("23: one loading screen at a time", ".bigspin:has(~ .bigspin:not(" in CSS)
+check("24: connectors already added: darker gray text, no gray highlight", "color:#6b7280;cursor:not-allowed" in JS
+      and "color:#6b7280;background:#f3f4f6" not in JS)
+
 print("\nALL CHECKS PASSED" if ok else "\n*** FAILURES ***")
 sys.exit(0 if ok else 1)

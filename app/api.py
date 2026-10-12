@@ -3632,10 +3632,7 @@ WEIGHT_LABELS = {
               "The email address associated with the profile matches the email "
               "address in the bill's memo."),
     "order": ("Order Number",
-              "The order number on the transaction matches the one on the "
-              "bill. Compared on digits only, so the same reference written "
-              "differently still matches; needs six digits or more, and scores "
-              "nothing when either side has no order number."),
+              "The order number on the transaction matches the one on the bill."),
     "vendor": ("Vendor", "Words shared between the bank detail and the bill's "
                          "vendor."),
     "text": ("Text Overlap", "Words shared between the bank detail and the "
@@ -6056,7 +6053,8 @@ def save_match_rule(bank_detail: str = Form(""), bill_vendor: str = Form(""),
     db.add(AuditRow(company="", action="match_rule_saved",
                     detail=(f"'{phrase}'"
                             + (f" -> {vendor}" if vendor else "")
-                            + (" | no buyer email" if ig_email else "")
+                            + ((" | buyer email treated as a perfect match" if item == "vendor" else " | no buyer email")
+                               if ig_email else "")
                             + (" | no performer text" if ig_text else "")),
                     dry_run=False, actor=user.username))
     db.commit()
@@ -11442,7 +11440,7 @@ def _is_test_company(db, company: str) -> bool:
 
 
 # --- Profiles (Configuration > Profiles) ------------------------------------
-PROFILE_HEADERS = ["Card Account", "Bank Detail Rule",
+PROFILE_HEADERS = ["Rule Name", "Card Account", "Bank Detail Rule",
                    "Bank Detail Value (Comma Separated)", "Team", "Profile"]
 
 
@@ -11546,9 +11544,10 @@ def apply_profile_rules(company: str = Form(...), db: Session = Depends(get_sess
 def profile_template(company: str = "", db: Session = Depends(get_session),
                      user: UserRow = Depends(require_reviewer)):
     from .export_xlsx import build_workbook, filename
-    rows = [["EXAMPLE — delete this row", "Contains", "TICKETMASTER, TM *",
+    rows = [["EXAMPLE — delete this row", "Amex Business", "Contains", "TICKETMASTER, TM *",
              "Any", "Pat Doe"]]
     applied = [
+        ("Rule Name", "Optional: a name for the rule"),
         ("Card Account", "The card account's name, as on Bank / Card Accounts"),
         ("Bank Detail Rule", "Contains or Any"),
         ("Bank Detail Value", "One or more values, comma separated -- only for Contains"),
@@ -11587,7 +11586,7 @@ async def import_profile_rules(company: str = Form(...), file: UploadFile = File
                 if h.startswith(n):
                     return i
         return None
-    ci = {"acct": col("card account"), "op": col("bank detail rule"),
+    ci = {"name": col("rule name"), "acct": col("card account"), "op": col("bank detail rule"),
           "val": col("bank detail value"), "team": col("team"), "prof": col("profile")}
     if ci["acct"] is None or ci["prof"] is None:
         raise HTTPException(400, "The sheet needs Card Account and Profile columns "
@@ -11600,7 +11599,7 @@ async def import_profile_rules(company: str = Form(...), file: UploadFile = File
         acct, prof = get("acct"), get("prof")
         if not acct and not prof:
             continue
-        if acct.upper().startswith("EXAMPLE"):
+        if acct.upper().startswith("EXAMPLE") or get("name").upper().startswith("EXAMPLE"):
             continue
         # One card account, or several separated by commas.
         _parts = [a.strip() for a in acct.split(",") if a.strip()]
@@ -11609,7 +11608,7 @@ async def import_profile_rules(company: str = Form(...), file: UploadFile = File
         if _miss or not src:
             skipped.append(f"row {n}: no card account named \"{(_miss or [acct])[0]}\"")
             continue
-        new.append({"source": src, "op": get("op") or "Any", "value": get("val"),
+        new.append({"name": get("name"), "source": src, "op": get("op") or "Any", "value": get("val"),
                     "teams": [t for t in get("team").split(",")] or ["Any"],
                     "profile": prof})
     saved = _pf.save(db, company, _pf.rules(db, company) + new)

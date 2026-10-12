@@ -150,7 +150,7 @@ check("1: row Saves stay on screen, gray until there is something to save",
       '.ruleSave[style*="visibility:hidden"]' in CSS and "pointer-events:none" in CSS)
 check("2: each renewal year's line carries its own seat rows", "y.rows > 1" in JS)
 check("3: removing a profiles row asks with no subtext and saves at once",
-      "askConfirm('Remove this row?', '', 'Remove', 'Cancel')) return;\n    PF.rows.splice(Number(el.closest('tr').dataset.i), 1); PF.dirty = true; PF.sel = new Set(); await saveAll();" in JS)
+      "askConfirm('Remove this rule?', '', 'Remove', 'Cancel')) return;\n    PF.rows.splice(Number(el.closest('tr').dataset.i), 1); PF.dirty = true; PF.sel = new Set(); await saveAll();" in JS)
 check("4: red x's are drawn, centered", 'M2 2l6 6M8 2L2 8' in JS)
 check("5: the rate history date picker is narrow", 'aria-label="Go to date" style="font-size:12px;padding:2px 6px;width:150px"' in JS)
 check("6: Ignore Rows' column picker leaves room for the value", 'class="atIgnCol" data-i="${i}" data-n="${n}" style="flex:0 1 40%' in JS)
@@ -167,7 +167,7 @@ check("19: Credit Card Profiles and Bank Feed Rules reorder by a drag handle",
 check("20: row Clear buttons are red-outlined", 'id="ruleClear" title="Clear this row"\n                  style="background:#fff;color:var(--bad)' in JS)
 
 check("23: the Dashboard's Audit Log card ends where its columns end",
-      "#auditGrid.audit-dash #auditRows{border-radius:8px;width:max-content;max-width:100%}" in CSS)
+      "#auditGrid.audit-dash .ahead,#auditGrid.audit-dash .arow{width:max-content" in CSS)
 check("24: the Bank Feed's loading ring never shows over another screen",
       "!document.body.classList.contains('screen-open');\n    if (empty) gridBusyStart('Loading Bank Feed');" in JS
       and "LEAVING THE BANK FEED takes its loading ring with it" in JS)
@@ -176,7 +176,7 @@ check("25B: a shared rule's company ticks wait for the row's Save", "btn.dataset
 check("15: the account menu is as wide as its words", ".avatarmenu button{width:auto !important" in CSS)
 check("27: Add Connection is narrower; bottom buttons are centered in every window",
       "max-width:400px;width:92vw" in JS and 'display:flex;justify-content:flex-end;' not in JS)
-check("28: connectors already added are gray but readable", "color:#6b7280;background:#f3f4f6;cursor:not-allowed" in JS)
+check("28: connectors already added are gray but readable", "color:#6b7280;cursor:not-allowed" in JS)
 check("29: the WEX mark is drawn whole", 'const WEX_LOGO = `<svg viewBox="0 0 34 20"' in JS)
 check("30: Add New Connector lists icons and is only as wide as its items",
       "_ico(AT_LOGO) + 'Airtable'" in JS and "_ico(WEX_LOGO)" in JS and "width:max-content" in JS)
