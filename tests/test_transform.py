@@ -1385,3 +1385,34 @@ def test_concert_seasons_white_river_venues():
                             VenueName="White River Amphitheatre",
                             InitialTicketCostTotal=0, TicketCostTotal=100)])
     assert v == ["Live Nation White River"]
+
+
+def test_fold_parking_suffix():
+    import vendor_rules as vr
+    assert vr._fold_parking("Oriole Park at Camden Yards Parking Lots") == "Oriole Park at Camden Yards"
+    assert vr._fold_parking("Truist Park Parking") == "Truist Park"
+    assert vr._fold_parking("FooParking Lots") == "Foo"
+    assert vr._fold_parking("Citizens Bank Park") == "Citizens Bank Park"   # not a parking venue
+    assert vr._fold_parking("Parking") == "Parking"                         # never fold to empty
+
+
+def _venue_plus_parking_order(vendor, venue):
+    common = dict(CompanyName="YSA", Vendor=vendor, PerformerName="Some Act",
+                  AccountEmail="a@b.com", ExtPONumber="ORD1",
+                  InitialTicketCostTotal=0, CreatedDate=None)
+    return [_row(PurchaseOrderID=1, VenueName=venue, TicketCostTotal=200, **common),
+            _row(PurchaseOrderID=1, VenueName=venue + " Parking Lots", TicketCostTotal=140, **common)]
+
+
+def test_venue_and_parking_lot_make_one_bill():
+    # Rules that use the venue as the vendor must fold the parking-lot venue into
+    # the main venue, so one order comes out as one bill (not two).
+    cases = [("Tickets.com", "Oriole Park at Camden Yards"),
+             ("Sports Extras", "Shoreline Amphitheatre"),
+             ("Ticketmaster AM", "Shoreline Amphitheatre")]
+    for vendor, venue in cases:
+        rows = _venue_plus_parking_order(vendor, venue)
+        res = processor.process_files([(_to_xlsx_bytes(rows), "PO_Cost_Changes_2026-10-22.xlsx")])
+        pdb = processor.build_pd_bills(res["_cleaned"])
+        assert len(pdb) == 1, vendor
+        assert pdb.iloc[0]["Total Cost"] == 340, vendor

@@ -341,6 +341,22 @@ def clean_ext_po(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# Trailing parking-lot suffix on a venue name: "X Parking Lots", "X Parking Lot",
+# "X Parking", "XParking Lots" (no space), optionally after a dash.
+_PARKING_SUFFIX = re.compile(r"\s*[-–]?\s*Parking(?:\s*Lots?)?\s*$", re.IGNORECASE)
+
+
+def _fold_parking(venue: str) -> str:
+    """Fold a parking-lot venue into its main venue ("Oriole Park at Camden Yards
+    Parking Lots" -> "Oriole Park at Camden Yards"), so an order split across a
+    venue and its parking lot resolves to one vendor (one bill). Used only by the
+    rules that turn the venue into the vendor. Returns the input unchanged when
+    there's no parking suffix (or stripping would leave nothing)."""
+    s = str(venue)
+    folded = _PARKING_SUFFIX.sub("", s).strip()
+    return folded or s
+
+
 def _apply_vendor_replacements(df: pd.DataFrame) -> pd.DataFrame:
     """Stage 2: the two prepended rules + the VENDOR_REPLACEMENTS substring list."""
     df["Vendor"] = df["Vendor"].replace("Box Office", "Default Vendor")
@@ -365,6 +381,11 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     venue = df["VenueName"].astype("string").fillna("").map(lambda s: s.strip())
     perf = df["Team/Performer"].astype("string").fillna("").map(lambda s: s.strip())
     orig = df["Original Company"].astype("string").fillna("").map(lambda s: s.strip())
+    # Venue with any parking-lot suffix folded into the main venue. Used by the
+    # rules that make the venue the vendor (Ticketmaster AM / Ballpark, Sports
+    # Extras, Tickets.com), so venue + parking-lot rows on one order don't split
+    # into two vendors / two bills. Venue-map lookups still use the raw venue.
+    venue_main = venue.map(_fold_parking)
     teams = get_teams()  # lowercased set
 
     def is_team(name: str) -> bool:
@@ -385,7 +406,7 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
             return v
         if is_team(perf.iat[i]):
             return perf.iat[i]
-        return venue.iat[i] if venue.iat[i] else v
+        return venue_main.iat[i] if venue_main.iat[i] else v
     df["Vendor"] = [resolve_tm_am(i) for i in range(len(df))]
 
     # (The old rule 1b special-cased Concert Extras at MSG Entertainment venues
@@ -410,10 +431,10 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
         "radio city music hall",
         "beacon theatre - new york",
     }
-    msg_ent_mask = (df["Vendor"].astype(str) == "Sports Extras") & venue.str.lower().isin(msg_ent_venues)
+    msg_ent_mask = (df["Vendor"].astype(str) == "Sports Extras") & venue_main.str.lower().isin(msg_ent_venues)
     df.loc[msg_ent_mask, "Vendor"] = "Madison Square Garden"
     df["Vendor"] = np.where(
-        df["Vendor"].astype(str) == "Sports Extras", venue.values, df["Vendor"].astype(str)
+        df["Vendor"].astype(str) == "Sports Extras", venue_main.values, df["Vendor"].astype(str)
     )
     df["Vendor"] = pd.Series(df["Vendor"], index=df.index).astype("string")
 
@@ -451,7 +472,7 @@ def apply_vendor_pipeline(df: pd.DataFrame) -> pd.DataFrame:
         v = df["Vendor"].iat[i]
         if v != "Tickets.com":
             return v
-        return perf.iat[i] if is_team(perf.iat[i]) else (venue.iat[i] if venue.iat[i] else v)
+        return perf.iat[i] if is_team(perf.iat[i]) else (venue_main.iat[i] if venue_main.iat[i] else v)
     df["Vendor"] = [resolve_tickets_com(i) for i in range(len(df))]
 
     # 8. Proper-case, then fix known casing exceptions.
